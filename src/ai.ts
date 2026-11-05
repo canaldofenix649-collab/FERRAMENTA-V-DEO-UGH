@@ -2,7 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { UgcVideoSchema, ViralVideoSchema, type UgcVideo, type ViralVideo } from "./schemas.js";
 
-const MODEL = "claude-opus-5-5";
+/** Modelo usado nas gerações. Pode ser trocado no .env (ex.: claude-sonnet-5-5 para reduzir custo). */
+const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
+/** Fallback automático em caso de recusa: disponível para Opus, Sonnet e Fable. */
+const SUPPORTS_FALLBACK = /^claude-(opus|sonnet|fable)-5/.test(MODEL);
 const client = new Anthropic();
 
 export class AiError extends Error {
@@ -23,8 +26,7 @@ async function generateJson<T>(
     model: MODEL,
     max_tokens: 16000,
     // Se o modelo recusar por política, a API tenta automaticamente um modelo de fallback.
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+    ...(SUPPORTS_FALLBACK ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
     output_config: {
       effort: "medium",
       format: { type: "json_schema", schema: jsonSchema },

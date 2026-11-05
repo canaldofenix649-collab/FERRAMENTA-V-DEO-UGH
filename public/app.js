@@ -1,7 +1,93 @@
 const $ = (sel) => document.querySelector(sel);
 const statusEl = $("#status");
-let current = null; // último resultado gerado
+let current = null; // resultado exibido
 let playing = false;
+let me = null; // usuário logado
+let costs = { viral: 1, ugc: 2 };
+
+// ---------- API ----------
+async function api(url, options = {}) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && url !== "/api/auth/login") showAuth();
+  if (!res.ok) throw new Error(data.error || "Erro inesperado.");
+  return data;
+}
+const postJson = (url, body) =>
+  api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+// ---------- Sessão ----------
+function showAuth() {
+  me = null;
+  $("#topbar").classList.add("hidden");
+  $("#view-app").classList.add("hidden");
+  $("#view-auth").classList.remove("hidden");
+}
+
+function showApp(user) {
+  me = user;
+  $("#view-auth").classList.add("hidden");
+  $("#view-app").classList.remove("hidden");
+  $("#topbar").classList.remove("hidden");
+  $("#link-admin").classList.toggle("hidden", !user.isAdmin);
+  updateCredits(user.credits);
+}
+
+function updateCredits(n) {
+  me.credits = n;
+  $("#credits").textContent = `${n} crédito${n === 1 ? "" : "s"}`;
+}
+
+async function init() {
+  const data = await api("/api/me");
+  costs = data.costs;
+  document.querySelectorAll(".cost").forEach((el) => {
+    const c = costs[el.dataset.cost];
+    el.textContent = `(${c} crédito${c === 1 ? "" : "s"})`;
+  });
+  data.user ? showApp(data.user) : showAuth();
+}
+
+let authMode = "login";
+document.querySelectorAll(".auth-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    authMode = tab.dataset.mode;
+    document.querySelectorAll(".auth-tab").forEach((t) => t.classList.toggle("active", t === tab));
+    document.querySelectorAll(".only-register").forEach((el) => el.classList.toggle("hidden", authMode !== "register"));
+    $("#form-auth [name=name]").required = authMode === "register";
+    $("#form-auth [name=password]").autocomplete = authMode === "register" ? "new-password" : "current-password";
+    $("#auth-submit").textContent = authMode === "register" ? "Criar conta grátis" : "Entrar";
+    $("#auth-status").textContent = "";
+  });
+});
+
+$("#form-auth").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const button = $("#auth-submit");
+  const statusAuth = $("#auth-status");
+  button.disabled = true;
+  statusAuth.className = "status";
+  statusAuth.textContent = "";
+  try {
+    const body = Object.fromEntries(new FormData(e.target));
+    const data = await postJson(authMode === "register" ? "/api/auth/register" : "/api/auth/login", body);
+    e.target.reset();
+    showApp(data.user);
+  } catch (err) {
+    statusAuth.className = "status error";
+    statusAuth.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#btn-logout").addEventListener("click", async () => {
+  stop();
+  await postJson("/api/auth/logout", {});
+  $("#result").classList.add("hidden");
+  $("#history").classList.add("hidden");
+  showAuth();
+});
 
 // ---------- Abas ----------
 document.querySelectorAll(".tab").forEach((tab) => {
@@ -22,22 +108,26 @@ $("#form-ugc input[type=file]").addEventListener("change", (e) => {
   $("#drop-text").textContent = file.name;
 });
 
-// ---------- Envio dos formulários ----------
-async function submit(form, url, options) {
+// ---------- Geração ----------
+async function submit(form, request, kind) {
+  if (me && me.credits < costs[kind]) {
+    statusEl.className = "status error";
+    statusEl.textContent = "Você não tem créditos suficientes. Fale com o suporte para recarregar.";
+    return;
+  }
   const button = form.querySelector("button[type=submit]");
   button.disabled = true;
   statusEl.className = "status";
   statusEl.textContent = "A IA está criando seu vídeo... isso pode levar até um minuto.";
   try {
-    const res = await fetch(url, options);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Erro ao gerar.");
-    current = data;
-    statusEl.textContent = "Pronto!";
-    render(data);
+    const data = await request();
+    updateCredits(data.credits);
+    statusEl.textContent = "Pronto! O vídeo foi salvo em \"Meus vídeos\".";
+    render(data.result);
   } catch (err) {
     statusEl.className = "status error";
     statusEl.textContent = err.message;
+    init().catch(() => {}); // atualiza o saldo (créditos podem ter sido devolvidos)
   } finally {
     button.disabled = false;
   }
@@ -46,16 +136,51 @@ async function submit(form, url, options) {
 $("#form-viral").addEventListener("submit", (e) => {
   e.preventDefault();
   const body = Object.fromEntries(new FormData(e.target));
-  submit(e.target, "/api/viral", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  submit(e.target, () => postJson("/api/viral", body), "viral");
 });
 
 $("#form-ugc").addEventListener("submit", (e) => {
   e.preventDefault();
-  submit(e.target, "/api/ugc", { method: "POST", body: new FormData(e.target) });
+  const body = new FormData(e.target);
+  submit(e.target, () => api("/api/ugc", { method: "POST", body }), "ugc");
+});
+
+// ---------- Histórico ----------
+async function openHistory() {
+  const list = $("#history-list");
+  $("#history").classList.remove("hidden");
+  list.innerHTML = "<li>Carregando...</li>";
+  try {
+    const { items } = await api("/api/generations");
+    list.innerHTML = items.length
+      ? items.map((g) => `
+        <li>
+          <button class="open" data-id="${g.id}">
+            <span class="badge">${g.kind === "ugc" ? "UGC" : "Viral"}</span>${esc(g.title)}
+            <div class="meta">${esc(new Date(g.created_at.replace(" ", "T") + "Z").toLocaleString("pt-BR"))}</div>
+          </button>
+          <button class="link del" data-id="${g.id}">Excluir</button>
+        </li>`).join("")
+      : "<li>Você ainda não gerou nenhum vídeo.</li>";
+  } catch (err) {
+    list.innerHTML = `<li>${esc(err.message)}</li>`;
+  }
+}
+
+$("#btn-history").addEventListener("click", openHistory);
+$("#btn-history-close").addEventListener("click", () => $("#history").classList.add("hidden"));
+$("#history-list").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-id]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains("del")) {
+    if (!confirm("Excluir este vídeo do histórico?")) return;
+    await api(`/api/generations/${id}`, { method: "DELETE" });
+    openHistory();
+  } else {
+    const { result } = await api(`/api/generations/${id}`);
+    render(result);
+  }
 });
 
 // ---------- Renderização ----------
@@ -66,6 +191,7 @@ const card = (title, html) => `<div class="card"><h3>${esc(title)}</h3>${html}</
 
 function render(data) {
   stop();
+  current = data;
   const parts = [];
 
   if (data.product) {
@@ -161,3 +287,5 @@ function stop() {
 
 $("#play").onclick = play;
 $("#stop").onclick = stop;
+
+init().catch(() => showAuth());

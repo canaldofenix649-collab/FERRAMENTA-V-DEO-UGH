@@ -7,17 +7,51 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="topbar" class="topbar hidden">
+  <strong class="brand">Estúdio Viral IA</strong>
+  <div class="topbar-right">
+    <span id="credits" class="credits"></span>
+    <button id="btn-history" class="link">Meus vídeos</button>
+    <a id="link-admin" class="link hidden" href="admin.html">Admin</a>
+    <button id="btn-logout" class="link">Sair</button>
+  </div>
+</div>
+
 <header>
   <h1>Estúdio Viral IA</h1>
   <p>Crie shorts virais a partir de um título ou transforme a foto de um produto em vídeo UGC com influenciadora.</p>
 </header>
 
-<nav class="tabs">
-  <button class="tab active" data-tab="viral">Shorts viral</button>
-  <button class="tab" data-tab="ugc">Vídeo UGC de produto</button>
-</nav>
+<!-- ---------- Login / cadastro ---------- -->
+<main id="view-auth" class="auth hidden">
+  <section class="panel">
+    <nav class="tabs small">
+      <button class="auth-tab active" data-mode="login">Entrar</button>
+      <button class="auth-tab" data-mode="register">Criar conta</button>
+    </nav>
+    <form id="form-auth" class="form">
+      <label class="only-register hidden">Nome
+        <input name="name" autocomplete="name">
+      </label>
+      <label>E-mail
+        <input name="email" type="email" required autocomplete="email">
+      </label>
+      <label>Senha
+        <input name="password" type="password" required minlength="8" autocomplete="current-password">
+      </label>
+      <button type="submit" id="auth-submit">Entrar</button>
+      <p id="auth-status" class="status"></p>
+    </form>
+  </section>
+</main>
 
-<main>
+<!-- ---------- Ferramenta ---------- -->
+<main id="view-app" class="hidden">
+  <nav class="tabs">
+    <button class="tab active" data-tab="viral">Shorts viral</button>
+    <button class="tab" data-tab="ugc">Vídeo UGC de produto</button>
+  </nav>
+
   <section class="panel">
     <form id="form-viral" class="form">
       <label>Título ou ideia do vídeo
@@ -46,7 +80,7 @@
           <input name="niche" placeholder="finanças, fitness, curiosidades...">
         </label>
       </div>
-      <button type="submit">Gerar vídeo viral</button>
+      <button type="submit">Gerar vídeo viral <span class="cost" data-cost="viral"></span></button>
     </form>
 
     <form id="form-ugc" class="form hidden" enctype="multipart/form-data">
@@ -74,10 +108,18 @@
           <input name="durationSeconds" type="number" min="10" max="120" value="30">
         </label>
       </div>
-      <button type="submit">Gerar vídeo UGC</button>
+      <button type="submit">Gerar vídeo UGC <span class="cost" data-cost="ugc"></span></button>
     </form>
 
     <p id="status" class="status"></p>
+  </section>
+
+  <section id="history" class="panel history hidden">
+    <div class="history-head">
+      <h2>Meus vídeos</h2>
+      <button id="btn-history-close" class="link">Fechar</button>
+    </div>
+    <ul id="history-list"></ul>
   </section>
 
   <section id="result" class="result hidden">
@@ -92,8 +134,8 @@
         <button id="play">▶ Tocar prévia com voz</button>
         <button id="stop" class="secondary">■ Parar</button>
       </div>
-      <p class="hint">A prévia usa a voz do navegador. Para o vídeo final, use os prompts de cada cena
-        nas ferramentas de imagem/vídeo/avatar (veja o README).</p>
+      <p class="hint">A prévia usa a voz do navegador. Use os prompts de cada cena em ferramentas de
+        imagem, vídeo e avatar para produzir o vídeo final.</p>
     </div>
     <div id="details" class="details"></div>
   </section>

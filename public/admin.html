@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Admin</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="topbar">
+  <strong class="brand">Estúdio Viral IA · Admin</strong>
+  <div class="topbar-right"><a class="link" href="/">Voltar para a ferramenta</a></div>
+</div>
+
+<main style="margin-top:24px">
+  <section class="panel">
+    <div id="stats" class="stats"></div>
+    <div class="row" style="margin-bottom:12px">
+      <input id="search" placeholder="Buscar por nome ou e-mail">
+      <p id="status" class="status" style="margin:0"></p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Usuário</th><th>Créditos</th><th>Vídeos</th><th>Cadastro</th><th>Adicionar créditos</th></tr></thead>
+        <tbody id="users"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+async function api(url, options) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 || res.status === 403) { location.href = "/"; throw new Error(); }
+  if (!res.ok) throw new Error(data.error || "Erro.");
+  return data;
+}
+
+async function loadStats() {
+  const s = await api("/api/admin/stats");
+  $("#stats").innerHTML = `
+    <div class="stat"><b>${s.users}</b>usuários</div>
+    <div class="stat"><b>${s.generations}</b>vídeos gerados</div>
+    <div class="stat"><b>${s.generations_24h}</b>nas últimas 24h</div>`;
+}
+
+async function loadUsers() {
+  const { users } = await api("/api/admin/users?q=" + encodeURIComponent($("#search").value));
+  $("#users").innerHTML = users.map((u) => `
+    <tr>
+      <td>${esc(u.name)}${u.is_admin ? ' <span class="badge">admin</span>' : ""}<br><small>${esc(u.email)}</small></td>
+      <td><b>${u.credits}</b></td>
+      <td>${u.generations}</td>
+      <td>${esc(u.created_at.slice(0, 10).split("-").reverse().join("/"))}</td>
+      <td><input type="number" value="10" data-amount="${u.id}"> <button data-add="${u.id}">Adicionar</button></td>
+    </tr>`).join("") || '<tr><td colspan="5">Nenhum usuário.</td></tr>';
+}
+
+$("#users").addEventListener("click", async (e) => {
+  const id = e.target.dataset.add;
+  if (!id) return;
+  const amount = Number(document.querySelector(`[data-amount="${id}"]`).value);
+  try {
+    await api(`/api/admin/users/${id}/credits`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount }),
+    });
+    $("#status").className = "status";
+    $("#status").textContent = `${amount > 0 ? "+" : ""}${amount} créditos aplicados.`;
+    loadUsers();
+  } catch (err) {
+    $("#status").className = "status error";
+    $("#status").textContent = err.message;
+  }
+});
+
+let timer;
+$("#search").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(loadUsers, 300); });
+
+loadStats();
+loadUsers();
+</script>
+</body>
+</html>

@@ -6,27 +6,164 @@ import express, { type NextFunction, type Request, type Response } from "express
 import multer from "multer";
 import { z } from "zod";
 import { AiError, generateUgcVideo, generateViralVideo, type UgcInput } from "./ai.js";
+import {
+  endSession,
+  hashPassword,
+  loadUser,
+  rateLimiter,
+  requireAdmin,
+  requireUser,
+  startSession,
+  verifyPassword,
+} from "./auth.js";
+import * as db from "./db.js";
+
+// ---------- Configuração (pode ser alterada no .env) ----------
+const config = {
+  freeCredits: Number(process.env.FREE_CREDITS ?? 3),
+  costViral: Number(process.env.COST_VIRAL ?? 1),
+  costUgc: Number(process.env.COST_UGC ?? 2),
+  adminEmail: (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase(),
+};
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
+if (process.env.TRUST_PROXY) app.set("trust proxy", 1); // necessário atrás de Render, Railway, Nginx etc.
+app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
+app.use(loadUser);
 app.use(express.static(path.join(here, "..", "public")));
 
-const ViralBody = z.object({
-  title: z.string().trim().min(3).max(300),
-  platform: z.string().default("TikTok / Reels / Shorts"),
-  durationSeconds: z.coerce.number().int().min(10).max(180).default(30),
-  tone: z.string().default("energético e curioso"),
-  niche: z.string().optional(),
-  language: z.string().default("Português do Brasil"),
+const publicUser = (u: db.User) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  credits: u.credits,
+  isAdmin: Boolean(u.is_admin),
 });
 
-app.post("/api/viral", async (req, res, next) => {
+// ---------- Autenticação ----------
+const authLimiter = rateLimiter(10, 15 * 60 * 1000); // 10 tentativas por IP a cada 15 min
+
+const RegisterBody = z.object({
+  name: z.string().trim().min(2, "Informe seu nome.").max(80),
+  email: z.string().trim().toLowerCase().email("E-mail inválido."),
+  password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres.").max(200),
+});
+
+app.post("/api/auth/register", async (req, res, next) => {
+  try {
+    if (!authLimiter(`ip:${req.ip}`)) {
+      res.status(429).json({ error: "Muitas tentativas. Tente novamente em alguns minutos." });
+      return;
+    }
+    const body = RegisterBody.parse(req.body);
+    if (db.findUserWithPasswordByEmail(body.email)) {
+      res.status(409).json({ error: "Já existe uma conta com este e-mail." });
+      return;
+    }
+    const isAdmin = config.adminEmail !== "" && body.email === config.adminEmail;
+    const user = db.createUser(body.name, body.email, await hashPassword(body.password), config.freeCredits, isAdmin);
+    startSession(res, user.id);
+    res.status(201).json({ user: publicUser(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const LoginBody = z.object({
+  email: z.string().trim().toLowerCase(),
+  password: z.string(),
+});
+
+app.post("/api/auth/login", async (req, res, next) => {
+  try {
+    if (!authLimiter(`ip:${req.ip}`)) {
+      res.status(429).json({ error: "Muitas tentativas. Tente novamente em alguns minutos." });
+      return;
+    }
+    const body = LoginBody.parse(req.body);
+    const found = db.findUserWithPasswordByEmail(body.email);
+    if (!found || !(await verifyPassword(body.password, found.password_hash))) {
+      res.status(401).json({ error: "E-mail ou senha incorretos." });
+      return;
+    }
+    if (config.adminEmail && found.email === config.adminEmail && !found.is_admin) db.setAdmin(found.id, true);
+    startSession(res, found.id);
+    res.json({ user: publicUser(db.findUserById(found.id)!) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  endSession(req, res);
+  res.json({ ok: true });
+});
+
+app.get("/api/me", (req, res) => {
+  res.json({
+    user: req.user ? publicUser(req.user) : null,
+    costs: { viral: config.costViral, ugc: config.costUgc },
+  });
+});
+
+// ---------- Geração (consome créditos) ----------
+const generationLimiter = rateLimiter(10, 60 * 1000); // até 10 gerações por minuto por usuário
+const inProgress = new Set<number>(); // uma geração por vez por usuário
+
+async function runGeneration<T>(
+  req: Request,
+  res: Response,
+  kind: "viral" | "ugc",
+  generate: () => Promise<T>,
+  titleOf: (result: T) => string,
+): Promise<void> {
+  const user = req.user!;
+  const cost = kind === "viral" ? config.costViral : config.costUgc;
+
+  if (inProgress.has(user.id)) {
+    res.status(429).json({ error: "Aguarde a geração atual terminar." });
+    return;
+  }
+  if (!generationLimiter(`user:${user.id}`)) {
+    res.status(429).json({ error: "Muitas gerações em pouco tempo. Aguarde um minuto." });
+    return;
+  }
+  const reason = kind === "viral" ? "Shorts viral" : "Vídeo UGC";
+  if (!db.spendCredits(user.id, cost, reason)) {
+    res.status(402).json({ error: `Créditos insuficientes. Esta geração custa ${cost} crédito(s).` });
+    return;
+  }
+
+  inProgress.add(user.id);
+  try {
+    const result = await generate();
+    const id = db.saveGeneration(user.id, kind, titleOf(result), result);
+    res.json({ id, kind, result, credits: db.findUserById(user.id)!.credits });
+  } catch (err) {
+    db.addCredits(user.id, cost, `Estorno: falha na geração (${reason})`);
+    throw err;
+  } finally {
+    inProgress.delete(user.id);
+  }
+}
+
+const ViralBody = z.object({
+  title: z.string().trim().min(3, "Escreva um título com pelo menos 3 caracteres.").max(300),
+  platform: z.string().max(60).default("TikTok / Reels / Shorts"),
+  durationSeconds: z.coerce.number().int().min(10).max(180).default(30),
+  tone: z.string().max(80).default("energético e curioso"),
+  niche: z.string().max(120).optional(),
+  language: z.string().max(40).default("Português do Brasil"),
+});
+
+app.post("/api/viral", requireUser, async (req, res, next) => {
   try {
     const body = ViralBody.parse(req.body);
-    res.json(await generateViralVideo(body));
+    await runGeneration(req, res, "viral", () => generateViralVideo(body), (r) => r.title || body.title);
   } catch (err) {
     next(err);
   }
@@ -36,12 +173,12 @@ const UgcBody = z.object({
   productNotes: z.string().max(2000).optional(),
   influencerStyle: z.string().max(500).optional(),
   durationSeconds: z.coerce.number().int().min(10).max(120).default(30),
-  language: z.string().default("Português do Brasil"),
+  language: z.string().max(40).default("Português do Brasil"),
 });
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 
-app.post("/api/ugc", upload.single("image"), async (req, res, next) => {
+app.post("/api/ugc", requireUser, upload.single("image"), async (req, res, next) => {
   try {
     const file = req.file;
     if (!file) {
@@ -55,36 +192,92 @@ app.post("/api/ugc", upload.single("image"), async (req, res, next) => {
     }
     const body = UgcBody.parse(req.body);
     const input: UgcInput = { ...body, imageBase64: file.buffer.toString("base64"), mediaType };
-    res.json(await generateUgcVideo(input));
+    await runGeneration(req, res, "ugc", () => generateUgcVideo(input), (r) => r.product.name);
   } catch (err) {
     next(err);
   }
 });
 
+// ---------- Histórico ----------
+app.get("/api/generations", requireUser, (req, res) => {
+  res.json({ items: db.listGenerations(req.user!.id) });
+});
+
+app.get("/api/generations/:id", requireUser, (req, res) => {
+  const result = db.getGeneration(req.user!.id, Number(req.params.id));
+  if (!result) {
+    res.status(404).json({ error: "Não encontrado." });
+    return;
+  }
+  res.json({ result });
+});
+
+app.delete("/api/generations/:id", requireUser, (req, res) => {
+  const ok = db.deleteGeneration(req.user!.id, Number(req.params.id));
+  res.status(ok ? 200 : 404).json({ ok });
+});
+
+// ---------- Administração ----------
+app.get("/api/admin/stats", requireUser, requireAdmin, (_req, res) => {
+  res.json(db.stats());
+});
+
+app.get("/api/admin/users", requireUser, requireAdmin, (req, res) => {
+  const search = typeof req.query.q === "string" ? req.query.q.slice(0, 100) : "";
+  res.json({ users: db.listUsers(search) });
+});
+
+const CreditsBody = z.object({
+  amount: z.coerce.number().int().min(-100000).max(100000).refine((n) => n !== 0, "Informe um valor diferente de zero."),
+  reason: z.string().trim().max(200).optional(),
+});
+
+app.post("/api/admin/users/:id/credits", requireUser, requireAdmin, (req, res, next) => {
+  try {
+    const target = db.findUserById(Number(req.params.id));
+    if (!target) {
+      res.status(404).json({ error: "Usuário não encontrado." });
+      return;
+    }
+    const body = CreditsBody.parse(req.body);
+    db.addCredits(target.id, body.amount, body.reason || `Ajuste manual por ${req.user!.email}`);
+    res.json({ user: db.findUserById(target.id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- Erros ----------
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof z.ZodError) {
-    res.status(400).json({ error: "Dados inválidos.", details: err.issues });
+    res.status(400).json({ error: err.issues[0]?.message ?? "Dados inválidos." });
   } else if (err instanceof multer.MulterError) {
-    res.status(400).json({ error: `Erro no upload: ${err.message}` });
+    res.status(400).json({ error: err.code === "LIMIT_FILE_SIZE" ? "Imagem maior que 5 MB." : `Erro no upload: ${err.message}` });
   } else if (err instanceof AiError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json({ error: `${err.message} Seus créditos foram devolvidos.` });
   } else if (err instanceof Anthropic.AuthenticationError) {
-    res.status(500).json({ error: "Chave da API inválida. Confira ANTHROPIC_API_KEY no .env." });
+    console.error("Chave da API da Anthropic inválida.");
+    res.status(503).json({ error: "Serviço de IA indisponível no momento. Seus créditos foram devolvidos." });
   } else if (err instanceof Anthropic.RateLimitError) {
-    res.status(429).json({ error: "Muitas requisições. Aguarde alguns segundos e tente de novo." });
+    res.status(503).json({ error: "A IA está sobrecarregada. Tente de novo em instantes. Seus créditos foram devolvidos." });
   } else if (err instanceof Anthropic.APIError) {
     console.error(err);
-    res.status(502).json({ error: `Erro da IA (${err.status ?? "rede"}). Tente novamente.` });
+    res.status(502).json({ error: "Erro na IA. Tente novamente. Seus créditos foram devolvidos." });
   } else {
     console.error(err);
     res.status(500).json({ error: "Erro inesperado." });
   }
 });
 
+setInterval(db.deleteExpiredSessions, 60 * 60 * 1000).unref();
+
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {
   console.log(`Ferramenta rodando em http://localhost:${port}`);
   if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
     console.warn("Aviso: ANTHROPIC_API_KEY não definida. Copie .env.example para .env e coloque sua chave.");
+  }
+  if (!config.adminEmail) {
+    console.warn("Aviso: ADMIN_EMAIL não definido. Defina no .env para acessar o painel de administração.");
   }
 });

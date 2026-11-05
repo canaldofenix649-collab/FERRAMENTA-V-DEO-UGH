@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Ferramenta com IA para criar shorts virais e vídeos UGC a partir de um título ou da foto de um produto.",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "tsx watch --disable-warning=ExperimentalWarning src/server.ts",
+    "start": "tsx --disable-warning=ExperimentalWarning src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -22,5 +22,8 @@
     "@types/node": "^26.6.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }
