@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estúdio Viral IA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Estúdio Viral IA</h1>
+  <p>Crie shorts virais a partir de um título ou transforme a foto de um produto em vídeo UGC com influenciadora.</p>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="viral">Shorts viral</button>
+  <button class="tab" data-tab="ugc">Vídeo UGC de produto</button>
+</nav>
+
+<main>
+  <section class="panel">
+    <form id="form-viral" class="form">
+      <label>Título ou ideia do vídeo
+        <input name="title" required placeholder="Ex.: 3 hábitos que bilionários fazem antes das 7h">
+      </label>
+      <div class="row">
+        <label>Plataforma
+          <select name="platform">
+            <option>TikTok / Reels / Shorts</option><option>TikTok</option>
+            <option>Instagram Reels</option><option>YouTube Shorts</option>
+          </select>
+        </label>
+        <label>Duração (s)
+          <input name="durationSeconds" type="number" min="10" max="180" value="30">
+        </label>
+      </div>
+      <div class="row">
+        <label>Tom
+          <select name="tone">
+            <option>energético e curioso</option><option>polêmico e provocativo</option>
+            <option>engraçado</option><option>educativo e direto</option>
+            <option>misterioso / storytelling</option><option>motivacional</option>
+          </select>
+        </label>
+        <label>Nicho (opcional)
+          <input name="niche" placeholder="finanças, fitness, curiosidades...">
+        </label>
+      </div>
+      <button type="submit">Gerar vídeo viral</button>
+    </form>
+
+    <form id="form-ugc" class="form hidden" enctype="multipart/form-data">
+      <label class="drop">
+        <input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required>
+        <img id="preview-img" alt="" hidden>
+        <span id="drop-text">Clique para enviar a foto do produto (até 5 MB)</span>
+      </label>
+      <label>Informações do produto (opcional)
+        <textarea name="productNotes" rows="3" placeholder="Preço, promoção, diferenciais, link..."></textarea>
+      </label>
+      <div class="row">
+        <label>Estilo da influenciadora
+          <select name="influencerStyle">
+            <option value="">IA escolhe a melhor</option>
+            <option>jovem 20-25 anos, descontraída, estilo TikTok</option>
+            <option>mãe 30-40 anos, prática e sincera</option>
+            <option>especialista / profissional confiável</option>
+            <option>fitness, energética</option>
+            <option>beleza / skincare, delicada</option>
+            <option>homem 25-35 anos, tech / gadgets</option>
+          </select>
+        </label>
+        <label>Duração (s)
+          <input name="durationSeconds" type="number" min="10" max="120" value="30">
+        </label>
+      </div>
+      <button type="submit">Gerar vídeo UGC</button>
+    </form>
+
+    <p id="status" class="status"></p>
+  </section>
+
+  <section id="result" class="result hidden">
+    <div class="player-col">
+      <div class="phone">
+        <div id="stage" class="stage">
+          <div id="stage-visual" class="stage-visual"></div>
+          <div id="stage-text" class="stage-text">▶ Prévia</div>
+        </div>
+      </div>
+      <div class="player-controls">
+        <button id="play">▶ Tocar prévia com voz</button>
+        <button id="stop" class="secondary">■ Parar</button>
+      </div>
+      <p class="hint">A prévia usa a voz do navegador. Para o vídeo final, use os prompts de cada cena
+        nas ferramentas de imagem/vídeo/avatar (veja o README).</p>
+    </div>
+    <div id="details" class="details"></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
