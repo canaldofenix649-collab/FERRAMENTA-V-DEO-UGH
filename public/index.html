@@ -134,8 +134,14 @@
         <button id="play">▶ Tocar prévia com voz</button>
         <button id="stop" class="secondary">■ Parar</button>
       </div>
-      <p class="hint">A prévia usa a voz do navegador. Use os prompts de cada cena em ferramentas de
-        imagem, vídeo e avatar para produzir o vídeo final.</p>
+      <div class="video-box">
+        <button id="btn-video">🎬 Gerar vídeo MP4 <span class="cost" data-cost="video"></span></button>
+        <p id="video-status" class="status"></p>
+        <div id="video-files" class="video-files"></div>
+        <p id="video-admin-hint" class="hint hidden"></p>
+      </div>
+      <p class="hint">A prévia acima usa a voz do navegador. O MP4 é gerado com imagens e narração por IA,
+        em 1080x1920, pronto para postar.</p>
     </div>
     <div id="details" class="details"></div>
   </section>

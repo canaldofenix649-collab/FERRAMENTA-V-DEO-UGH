@@ -3,7 +3,10 @@ const statusEl = $("#status");
 let current = null; // resultado exibido
 let playing = false;
 let me = null; // usuário logado
-let costs = { viral: 1, ugc: 2 };
+let costs = { viral: 1, ugc: 2, video: 3 };
+let features = { aiImages: false, narration: false };
+let currentId = null; // id da geração exibida
+let videoPoll = null;
 
 // ---------- API ----------
 async function api(url, options = {}) {
@@ -41,6 +44,7 @@ function updateCredits(n) {
 async function init() {
   const data = await api("/api/me");
   costs = data.costs;
+  features = data.features;
   document.querySelectorAll(".cost").forEach((el) => {
     const c = costs[el.dataset.cost];
     el.textContent = `(${c} crédito${c === 1 ? "" : "s"})`;
@@ -83,6 +87,8 @@ $("#form-auth").addEventListener("submit", async (e) => {
 
 $("#btn-logout").addEventListener("click", async () => {
   stop();
+  clearTimeout(videoPoll);
+  currentId = null;
   await postJson("/api/auth/logout", {});
   $("#result").classList.add("hidden");
   $("#history").classList.add("hidden");
@@ -123,7 +129,7 @@ async function submit(form, request, kind) {
     const data = await request();
     updateCredits(data.credits);
     statusEl.textContent = "Pronto! O vídeo foi salvo em \"Meus vídeos\".";
-    render(data.result);
+    render(data.result, data.id, null);
   } catch (err) {
     statusEl.className = "status error";
     statusEl.textContent = err.message;
@@ -178,8 +184,8 @@ $("#history-list").addEventListener("click", async (e) => {
     await api(`/api/generations/${id}`, { method: "DELETE" });
     openHistory();
   } else {
-    const { result } = await api(`/api/generations/${id}`);
-    render(result);
+    const data = await api(`/api/generations/${id}`);
+    render(data.result, data.id, data.video);
   }
 });
 
@@ -189,9 +195,10 @@ const esc = (s) =>
 const list = (items) => `<ul>${(items || []).map((i) => `<li>${esc(i)}</li>`).join("")}</ul>`;
 const card = (title, html) => `<div class="card"><h3>${esc(title)}</h3>${html}</div>`;
 
-function render(data) {
+function render(data, id, video) {
   stop();
   current = data;
+  currentId = id;
   const parts = [];
 
   if (data.product) {
@@ -236,6 +243,7 @@ function render(data) {
   $("#details").innerHTML = parts.join("");
   $("#result").classList.remove("hidden");
   showScene(data.scenes[0], 0);
+  showVideo(video);
 
   $("#copy-script").onclick = () => navigator.clipboard.writeText(data.full_script);
   $("#download-json").onclick = () => {
@@ -287,5 +295,85 @@ function stop() {
 
 $("#play").onclick = play;
 $("#stop").onclick = stop;
+
+// ---------- Vídeo MP4 ----------
+function resetPhone() {
+  const phone = document.querySelector(".phone");
+  const v = phone.querySelector("video");
+  if (v) v.remove();
+  $("#stage").classList.remove("hidden");
+  $(".player-controls").classList.remove("hidden");
+}
+
+function showVideo(video) {
+  clearTimeout(videoPoll);
+  resetPhone();
+  const btn = $("#btn-video");
+  const status = $("#video-status");
+  const filesEl = $("#video-files");
+  status.className = "status";
+  status.textContent = "";
+  filesEl.innerHTML = "";
+  btn.classList.remove("hidden");
+  btn.disabled = false;
+
+  const hint = $("#video-admin-hint");
+  const missing = [!features.aiImages && "OPENAI_API_KEY (imagens com IA)", !features.narration && "ELEVENLABS_API_KEY (narração)"].filter(Boolean);
+  hint.classList.toggle("hidden", !(me && me.isAdmin && missing.length));
+  hint.textContent = missing.length ? `Admin: configure ${missing.join(" e ")} no servidor para vídeos completos.` : "";
+
+  if (!video) return;
+  if (video.status === "queued" || video.status === "processing") {
+    btn.disabled = true;
+    status.textContent = `${video.progress || "Processando..."} Pode levar alguns minutos.`;
+    const id = currentId;
+    videoPoll = setTimeout(async () => {
+      if (id !== currentId) return;
+      try {
+        const data = await api(`/api/generations/${id}/video`);
+        if (id === currentId) showVideo(data.video);
+      } catch {
+        videoPoll = setTimeout(() => showVideo(video), 5000);
+      }
+    }, 3000);
+  } else if (video.status === "error") {
+    status.className = "status error";
+    status.textContent = video.error;
+    init().catch(() => {});
+  } else if (video.status === "done") {
+    btn.classList.add("hidden");
+    const mp4 = video.files.find((f) => f.name.endsWith(".mp4"));
+    const pngs = video.files.filter((f) => f.name.endsWith(".png"));
+    if (mp4) {
+      $("#stage").classList.add("hidden");
+      $(".player-controls").classList.add("hidden");
+      const el = Object.assign(document.createElement("video"), { src: mp4.url, controls: true, playsInline: true });
+      document.querySelector(".phone").appendChild(el);
+    }
+    filesEl.innerHTML =
+      (mp4 ? `<a class="main button" href="${mp4.url}?download=1">⬇ Baixar vídeo MP4</a>` : "") +
+      pngs.map((f) => `<a href="${f.url}?download=1" title="Baixar ${esc(f.name)}"><img src="${f.url}" alt="${esc(f.name)}" loading="lazy">${esc(f.name.replace(".png", ""))}</a>`).join("");
+  }
+}
+
+$("#btn-video").addEventListener("click", async () => {
+  if (!currentId) return;
+  if (me.credits < costs.video) {
+    $("#video-status").className = "status error";
+    $("#video-status").textContent = "Você não tem créditos suficientes para gerar o vídeo.";
+    return;
+  }
+  $("#btn-video").disabled = true;
+  stop();
+  try {
+    const data = await api(`/api/generations/${currentId}/video`, { method: "POST" });
+    updateCredits(data.credits);
+    showVideo(data.video);
+  } catch (err) {
+    $("#btn-video").disabled = false;
+    $("#video-status").className = "status error";
+    $("#video-status").textContent = err.message;
+  }
+});
 
 init().catch(() => showAuth());

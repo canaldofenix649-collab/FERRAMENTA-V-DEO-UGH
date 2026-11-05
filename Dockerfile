@@ -1,4 +1,6 @@
 FROM node:22-slim
+# fontes usadas nas legendas dos vídeos
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

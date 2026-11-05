@@ -165,3 +165,59 @@ export function getGeneration(userId: number, id: number): unknown | undefined {
 export function deleteGeneration(userId: number, id: number): boolean {
   return db.prepare("DELETE FROM generations WHERE id = ? AND user_id = ?").run(id, userId).changes > 0;
 }
+
+// ---------- Vídeos renderizados (MP4 + PNGs) ----------
+db.exec(`
+  CREATE TABLE IF NOT EXISTS videos (
+    generation_id INTEGER PRIMARY KEY REFERENCES generations(id) ON DELETE CASCADE,
+    status        TEXT NOT NULL CHECK (status IN ('queued', 'processing', 'done', 'error')),
+    progress      TEXT NOT NULL DEFAULT '',
+    error         TEXT,
+    files         TEXT NOT NULL DEFAULT '[]',
+    cost          INTEGER NOT NULL DEFAULT 0,
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+export interface VideoRow {
+  generation_id: number;
+  status: "queued" | "processing" | "done" | "error";
+  progress: string;
+  error: string | null;
+  files: string[];
+  cost: number;
+}
+
+export function getVideo(generationId: number): VideoRow | undefined {
+  const row = db.prepare("SELECT * FROM videos WHERE generation_id = ?").get(generationId) as
+    | (Omit<VideoRow, "files"> & { files: string })
+    | undefined;
+  return row ? { ...row, files: JSON.parse(row.files) } : undefined;
+}
+
+export function upsertVideo(generationId: number, fields: Partial<Omit<VideoRow, "generation_id">>): void {
+  const current = getVideo(generationId);
+  const next = { status: "queued", progress: "", error: null, files: [], cost: 0, ...current, ...fields };
+  db.prepare(
+    `INSERT INTO videos (generation_id, status, progress, error, files, cost, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(generation_id) DO UPDATE SET status = excluded.status, progress = excluded.progress,
+       error = excluded.error, files = excluded.files, cost = excluded.cost, updated_at = excluded.updated_at`,
+  ).run(generationId, next.status, next.progress, next.error, JSON.stringify(next.files), next.cost);
+}
+
+/** Vídeos que estavam em andamento quando o servidor reiniciou. */
+export function unfinishedVideos(): { generation_id: number; user_id: number; cost: number }[] {
+  return db
+    .prepare(
+      `SELECT v.generation_id, g.user_id, v.cost FROM videos v JOIN generations g ON g.id = v.generation_id
+       WHERE v.status IN ('queued', 'processing')`,
+    )
+    .all() as { generation_id: number; user_id: number; cost: number }[];
+}
+
+export function getGenerationRow(userId: number, id: number) {
+  return db.prepare("SELECT id, kind, title, result FROM generations WHERE id = ? AND user_id = ?").get(id, userId) as
+    | { id: number; kind: "viral" | "ugc"; title: string; result: string }
+    | undefined;
+}

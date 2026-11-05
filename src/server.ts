@@ -17,12 +17,15 @@ import {
   verifyPassword,
 } from "./auth.js";
 import * as db from "./db.js";
+import { deleteMedia, mediaDir, renderVideo, saveProductImage, videoFeatures } from "./video.js";
 
 // ---------- Configuração (pode ser alterada no .env) ----------
 const config = {
   freeCredits: Number(process.env.FREE_CREDITS ?? 3),
   costViral: Number(process.env.COST_VIRAL ?? 1),
   costUgc: Number(process.env.COST_UGC ?? 2),
+  costVideo: Number(process.env.COST_VIDEO ?? 3),
+  maxParallelRenders: Number(process.env.MAX_PARALLEL_RENDERS ?? 2),
   adminEmail: (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase(),
 };
 
@@ -106,7 +109,8 @@ app.post("/api/auth/logout", (req, res) => {
 app.get("/api/me", (req, res) => {
   res.json({
     user: req.user ? publicUser(req.user) : null,
-    costs: { viral: config.costViral, ugc: config.costUgc },
+    costs: { viral: config.costViral, ugc: config.costUgc, video: config.costVideo },
+    features: videoFeatures,
   });
 });
 
@@ -120,6 +124,7 @@ async function runGeneration<T>(
   kind: "viral" | "ugc",
   generate: () => Promise<T>,
   titleOf: (result: T) => string,
+  afterSave?: (id: number) => Promise<void>,
 ): Promise<void> {
   const user = req.user!;
   const cost = kind === "viral" ? config.costViral : config.costUgc;
@@ -142,6 +147,7 @@ async function runGeneration<T>(
   try {
     const result = await generate();
     const id = db.saveGeneration(user.id, kind, titleOf(result), result);
+    await afterSave?.(id).catch((e) => console.error("Falha ao salvar arquivos da geração", e));
     res.json({ id, kind, result, credits: db.findUserById(user.id)!.credits });
   } catch (err) {
     db.addCredits(user.id, cost, `Estorno: falha na geração (${reason})`);
@@ -192,7 +198,9 @@ app.post("/api/ugc", requireUser, upload.single("image"), async (req, res, next)
     }
     const body = UgcBody.parse(req.body);
     const input: UgcInput = { ...body, imageBase64: file.buffer.toString("base64"), mediaType };
-    await runGeneration(req, res, "ugc", () => generateUgcVideo(input), (r) => r.product.name);
+    await runGeneration(req, res, "ugc", () => generateUgcVideo(input), (r) => r.product.name, (id) =>
+      saveProductImage(id, file.buffer),
+    );
   } catch (err) {
     next(err);
   }
@@ -204,17 +212,116 @@ app.get("/api/generations", requireUser, (req, res) => {
 });
 
 app.get("/api/generations/:id", requireUser, (req, res) => {
-  const result = db.getGeneration(req.user!.id, Number(req.params.id));
+  const id = Number(req.params.id);
+  const result = db.getGeneration(req.user!.id, id);
   if (!result) {
     res.status(404).json({ error: "Não encontrado." });
     return;
   }
-  res.json({ result });
+  res.json({ id, result, video: videoView(id) });
 });
 
 app.delete("/api/generations/:id", requireUser, (req, res) => {
-  const ok = db.deleteGeneration(req.user!.id, Number(req.params.id));
+  const id = Number(req.params.id);
+  if (renderQueue.active.has(id)) {
+    res.status(409).json({ error: "Aguarde o vídeo terminar de ser gerado." });
+    return;
+  }
+  const ok = db.deleteGeneration(req.user!.id, id);
+  if (ok) void deleteMedia(id);
   res.status(ok ? 200 : 404).json({ ok });
+});
+
+// ---------- Vídeo final (MP4 + PNGs) ----------
+const renderQueue = {
+  waiting: [] as { generationId: number; userId: number }[],
+  active: new Set<number>(),
+};
+
+function pumpRenderQueue(): void {
+  while (renderQueue.active.size < config.maxParallelRenders && renderQueue.waiting.length) {
+    const job = renderQueue.waiting.shift()!;
+    renderQueue.active.add(job.generationId);
+    void processRender(job.generationId, job.userId).finally(() => {
+      renderQueue.active.delete(job.generationId);
+      pumpRenderQueue();
+    });
+  }
+}
+
+async function processRender(generationId: number, userId: number): Promise<void> {
+  const row = db.getGenerationRow(userId, generationId);
+  const cost = db.getVideo(generationId)?.cost ?? 0;
+  if (!row) return;
+  try {
+    db.upsertVideo(generationId, { status: "processing", progress: "Começando..." });
+    const rendered = await renderVideo(generationId, row.kind, JSON.parse(row.result), (progress) =>
+      db.upsertVideo(generationId, { progress }),
+    );
+    db.upsertVideo(generationId, { status: "done", progress: "", files: rendered.files });
+  } catch (err) {
+    console.error(`Falha ao renderizar o vídeo ${generationId}`, err);
+    db.upsertVideo(generationId, {
+      status: "error",
+      progress: "",
+      error: "Não foi possível gerar o vídeo. Seus créditos foram devolvidos.",
+    });
+    if (cost > 0) db.addCredits(userId, cost, "Estorno: falha ao gerar vídeo MP4");
+  }
+}
+
+const videoView = (generationId: number) => {
+  const v = db.getVideo(generationId);
+  if (!v) return null;
+  return {
+    status: v.status,
+    progress: v.status === "queued" ? "Na fila..." : v.progress,
+    error: v.error,
+    files: v.files.map((name) => ({ name, url: `/api/generations/${generationId}/media/${name}` })),
+  };
+};
+
+app.post("/api/generations/:id/video", requireUser, (req, res) => {
+  const user = req.user!;
+  const generationId = Number(req.params.id);
+  if (!db.getGenerationRow(user.id, generationId)) {
+    res.status(404).json({ error: "Não encontrado." });
+    return;
+  }
+  const existing = db.getVideo(generationId);
+  if (existing && (existing.status === "queued" || existing.status === "processing")) {
+    res.json({ video: videoView(generationId), credits: user.credits });
+    return;
+  }
+  if (!db.spendCredits(user.id, config.costVideo, "Vídeo MP4")) {
+    res.status(402).json({ error: `Créditos insuficientes. O vídeo custa ${config.costVideo} crédito(s).` });
+    return;
+  }
+  db.upsertVideo(generationId, { status: "queued", progress: "", error: null, files: [], cost: config.costVideo });
+  renderQueue.waiting.push({ generationId, userId: user.id });
+  pumpRenderQueue();
+  res.status(202).json({ video: videoView(generationId), credits: db.findUserById(user.id)!.credits });
+});
+
+app.get("/api/generations/:id/video", requireUser, (req, res) => {
+  const generationId = Number(req.params.id);
+  if (!db.getGenerationRow(req.user!.id, generationId)) {
+    res.status(404).json({ error: "Não encontrado." });
+    return;
+  }
+  res.json({ video: videoView(generationId) });
+});
+
+app.get("/api/generations/:id/media/:file", requireUser, (req, res) => {
+  const generationId = Number(req.params.id);
+  const file = String(req.params.file);
+  const video = db.getGenerationRow(req.user!.id, generationId) && db.getVideo(generationId);
+  if (!video || !video.files.includes(file)) {
+    res.status(404).json({ error: "Arquivo não encontrado." });
+    return;
+  }
+  if (req.query.download) res.attachment(`video-${generationId}-${file}`);
+  res.sendFile(path.join(mediaDir(generationId), file));
 });
 
 // ---------- Administração ----------
@@ -270,6 +377,13 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 setInterval(db.deleteExpiredSessions, 60 * 60 * 1000).unref();
+
+// Vídeos interrompidos por uma reinicialização do servidor voltam para a fila.
+for (const job of db.unfinishedVideos()) {
+  db.upsertVideo(job.generation_id, { status: "queued" });
+  renderQueue.waiting.push({ generationId: job.generation_id, userId: job.user_id });
+}
+pumpRenderQueue();
 
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {

@@ -5,7 +5,7 @@ Ferramenta com IA para criar conteúdo para redes sociais:
 1. **Shorts viral**: você digita só o título ou a ideia, e a IA entrega ganchos, o roteiro dividido em cenas (fala, texto na tela, visual e prompt de imagem), a legenda, as hashtags, a ideia de thumbnail e a trilha.
 2. **Vídeo UGC de produto**: você sobe a foto do produto e a IA **lê a imagem**, identifica o produto, os benefícios, o público e as dores que ele resolve, cria uma **influenciadora fictícia** e escreve o roteiro dela divulgando o produto, com cenas, o prompt do avatar e ângulos de anúncio para testes A/B.
 
-Os dois modos têm uma **prévia em formato 9:16** que toca as cenas com o texto na tela e a narração usando a voz do navegador.
+Os dois modos têm uma **prévia em formato 9:16** e um botão **Gerar vídeo MP4**, que cria o vídeo final (1080x1920, pronto para postar) com imagens por IA, legendas e narração, além de um **PNG de cada cena**.
 
 Também tem **contas de usuário com créditos**, **histórico dos vídeos gerados** e um **painel de administração**, ou seja, já está pronta para receber clientes.
 
@@ -30,6 +30,7 @@ Depois, crie uma conta no site **com o mesmo e-mail do `ADMIN_EMAIL`**. Essa con
 | Estorno automático | Se a IA falhar, os créditos voltam para o usuário na hora |
 | Histórico | Cada vídeo gerado fica salvo em "Meus vídeos" para abrir de novo ou excluir |
 | Painel admin (`/admin.html`) | Lista de usuários, busca, quantos vídeos cada um gerou e botão para **adicionar ou remover créditos** (use número negativo para remover) |
+| Vídeo MP4 | Botão em cada vídeo gerado. Custa `COST_VIDEO` (3) créditos, roda em segundo plano e estorna se falhar |
 | Proteções | Limite de tentativas de login, até 10 gerações por minuto por usuário, uma geração por vez e imagem de no máximo 5 MB |
 
 Enquanto o pagamento automático não estiver integrado, a venda pode ser manual: o cliente paga (Pix, Hotmart, Kiwify...) e você adiciona os créditos pelo painel admin.
@@ -58,24 +59,35 @@ docker run -p 3000:3000 -v estudio-data:/data --env-file .env estudio-viral
 | `src/schemas.ts` | Formato dos resultados (cenas, ganchos, produto, influenciadora...) |
 | `src/db.ts` | Banco SQLite: usuários, sessões, créditos e histórico |
 | `src/auth.ts` | Senhas, sessões e limites de tentativas |
+| `src/video.ts` | Geração do MP4: imagens das cenas, legendas, narração e montagem com FFmpeg |
 | `public/` | Interface web (login, ferramenta, histórico, player de prévia e painel admin) |
 
-## Próximos passos: gerar o vídeo final (MP4)
+## Como o vídeo MP4 é feito
 
-Hoje a ferramenta gera **todo o planejamento** do vídeo e uma prévia. Para exportar o MP4 pronto, cada parte do resultado já vem preparada para uma API de mídia:
-
-| Etapa | Campo usado | Serviços possíveis |
+| Etapa | Serviço | Sem a chave |
 |---|---|---|
-| Voz da narração | `scenes[].narration` | ElevenLabs, OpenAI TTS, Google TTS |
-| Influenciadora falando (UGC) | `influencer.avatar_prompt` + `full_script` | HeyGen, D-ID, Synthesia, Captions/Mirage, Arcads |
-| Imagens e clipes das cenas | `scenes[].image_prompt` | Runway, Kling, Luma, Pika, Flux/SDXL, banco Pexels |
-| Legendas animadas e montagem | `scenes[].on_screen_text` + tempos | FFmpeg (local), Creatomate, Shotstack, Remotion |
+| Imagem de cada cena | OpenAI (`OPENAI_API_KEY`). No UGC, a foto do produto é enviada como referência para a influenciadora aparecer segurando o produto real | Fundo colorido (Shorts) ou a foto do produto (UGC) |
+| Narração | ElevenLabs (`ELEVENLABS_API_KEY`), uma voz para Shorts e outra para UGC | Vídeo sem narração |
+| Legendas e montagem | FFmpeg e sharp, rodando no próprio servidor (grátis) | Sempre funciona |
 
-Ordem sugerida para evoluir:
+Cada cena dura exatamente o tempo da narração, então as legendas ficam sincronizadas. A imagem recebe um zoom lento (efeito Ken Burns), como nos Shorts.
 
-1. **Narração com TTS** e montagem com **FFmpeg** (imagens das cenas, áudio e legendas queimadas) para gerar o MP4 de Shorts.
-2. **Avatar UGC** com uma API de avatar falante recebendo o roteiro e a foto do produto.
-3. **Pagamento automático** (Stripe, Mercado Pago, Hotmart ou Kiwify via webhook) creditando o usuário após a compra.
+Custo aproximado por vídeo de 6 a 8 cenas: imagens de US$ 0,05 a 0,30 cada (depende de `OPENAI_IMAGE_QUALITY`) e narração de alguns centavos. Confira os preços atuais em cada serviço e ajuste `COST_VIDEO`.
+
+## Chaves de API: onde ficam
+
+As chaves **nunca vão para o código nem para o GitHub**. Elas ficam só:
+
+- no arquivo `.env`, quando você roda no seu computador (ele está no `.gitignore`);
+- nas **variáveis de ambiente** do serviço de hospedagem (Railway, Render etc.), quando o site está no ar.
+
+Os clientes nunca veem as chaves: o navegador conversa com o seu servidor, e só o servidor conversa com as IAs. Configure um limite de gastos mensal no painel de cada serviço (Anthropic, OpenAI e ElevenLabs) para se proteger.
+
+## Próximos passos
+
+1. **Avatar falante no UGC** (HeyGen, D-ID ou Arcads), com a influenciadora mexendo a boca no ritmo da narração.
+2. **Pagamento automático** (Stripe, Mercado Pago, Hotmart ou Kiwify via webhook) creditando o usuário após a compra.
+3. **Música de fundo** e mais estilos de legenda.
 4. **Publicação direta** no TikTok, Instagram e YouTube e um calendário de postagens.
 
 > Use sempre influenciadoras **fictícias** geradas por IA, ou pessoas reais que tenham autorizado o uso da imagem. Em anúncios, sinalize quando o conteúdo for gerado por IA, conforme as regras de cada plataforma.
