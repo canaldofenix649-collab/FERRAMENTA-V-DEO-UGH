@@ -12,6 +12,7 @@
   <div class="topbar-right">
     <span id="credits" class="credits"></span>
     <button id="btn-history" class="link">Meus vídeos</button>
+    <button id="btn-voice" class="link hidden">Minha voz</button>
     <a id="link-admin" class="link hidden" href="admin.html">Admin</a>
     <button id="btn-logout" class="link">Sair</button>
   </div>
@@ -114,6 +115,40 @@
     <p id="status" class="status"></p>
   </section>
 
+  <section id="voice-panel" class="panel history hidden">
+    <div class="history-head">
+      <h2>Minha voz</h2>
+      <button id="btn-voice-close" class="link">Fechar</button>
+    </div>
+    <p id="voice-current" class="status"></p>
+
+    <div id="voice-form" class="form">
+      <p class="hint" style="text-align:left">Grave pelo menos <b data-min>20</b> segundos (o ideal é 1 minuto) num lugar
+        silencioso, falando naturalmente. Leia o texto abaixo, começando pela autorização.</p>
+      <div class="card voice-script">
+        <p><b id="voice-consent-text"></b></p>
+        <p>Oi, gente! Hoje eu vou mostrar uma coisa que mudou a minha rotina. Eu sempre fui muito curiosa e adoro
+          testar novidades, e quando algo funciona de verdade, eu faço questão de contar pra vocês. Então presta atenção,
+          porque essa dica é rápida, prática e pode te ajudar muito. Se você gostou, salva esse vídeo, manda pra quem
+          precisa ver e me segue pra mais conteúdos assim. Combinado? Então bora!</p>
+      </div>
+      <div class="recorder">
+        <button type="button" id="rec-start">● Gravar</button>
+        <button type="button" id="rec-stop" class="secondary" disabled>■ Parar</button>
+        <span id="rec-timer" class="rec-timer">0:00</span>
+      </div>
+      <audio id="rec-audio" controls hidden></audio>
+      <label>Ou envie um arquivo de áudio (MP3, WAV, M4A...)
+        <input type="file" id="voice-file" accept="audio/*">
+      </label>
+      <label class="check"><input type="checkbox" id="voice-consent">
+        <span>Confirmo que a voz gravada é <b>minha</b> e autorizo a criação de uma cópia digital dela para narrar os meus
+          vídeos. Sei que posso excluí-la a qualquer momento.</span></label>
+      <button type="button" id="voice-submit">Clonar minha voz <span class="cost" id="voice-cost"></span></button>
+      <p id="voice-status" class="status"></p>
+    </div>
+  </section>
+
   <section id="history" class="panel history hidden">
     <div class="history-head">
       <h2>Meus vídeos</h2>
@@ -135,6 +170,12 @@
         <button id="stop" class="secondary">■ Parar</button>
       </div>
       <div class="video-box">
+        <label id="video-voice-wrap" class="hidden">Voz da narração
+          <select id="video-voice">
+            <option value="ai">Voz da IA</option>
+            <option value="mine">Minha voz clonada</option>
+          </select>
+        </label>
         <button id="btn-video">🎬 Gerar vídeo MP4 <span class="cost" data-cost="video"></span></button>
         <p id="video-status" class="status"></p>
         <div id="video-files" class="video-files"></div>

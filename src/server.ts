@@ -17,7 +17,18 @@ import {
   verifyPassword,
 } from "./auth.js";
 import * as db from "./db.js";
-import { deleteMedia, mediaDir, renderVideo, saveProductImage, videoFeatures } from "./video.js";
+import os from "node:os";
+import {
+  cloneVoice,
+  deleteClonedVoice,
+  deleteMedia,
+  mediaDir,
+  MIN_VOICE_SECONDS,
+  renderVideo,
+  saveProductImage,
+  videoFeatures,
+  VoiceSampleError,
+} from "./video.js";
 
 // ---------- Configuração (pode ser alterada no .env) ----------
 const config = {
@@ -25,6 +36,7 @@ const config = {
   costViral: Number(process.env.COST_VIRAL ?? 1),
   costUgc: Number(process.env.COST_UGC ?? 2),
   costVideo: Number(process.env.COST_VIDEO ?? 3),
+  costVoice: Number(process.env.COST_VOICE_CLONE ?? 0),
   maxParallelRenders: Number(process.env.MAX_PARALLEL_RENDERS ?? 2),
   adminEmail: (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase(),
 };
@@ -255,8 +267,17 @@ async function processRender(generationId: number, userId: number): Promise<void
   if (!row) return;
   try {
     db.upsertVideo(generationId, { status: "processing", progress: "Começando..." });
-    const rendered = await renderVideo(generationId, row.kind, JSON.parse(row.result), (progress) =>
-      db.upsertVideo(generationId, { progress }),
+    let voiceId: string | undefined;
+    if (db.getVideoVoice(generationId) === "mine") {
+      voiceId = db.getUserVoice(userId)?.voiceId;
+      if (!voiceId) throw new Error("O usuário não tem mais voz clonada.");
+    }
+    const rendered = await renderVideo(
+      generationId,
+      row.kind,
+      JSON.parse(row.result),
+      (progress) => db.upsertVideo(generationId, { progress }),
+      { voiceId },
     );
     db.upsertVideo(generationId, { status: "done", progress: "", files: rendered.files });
   } catch (err) {
@@ -297,7 +318,14 @@ app.post("/api/generations/:id/video", requireUser, (req, res) => {
     res.status(402).json({ error: `Créditos insuficientes. O vídeo custa ${config.costVideo} crédito(s).` });
     return;
   }
+  const voice = req.body?.voice === "mine" ? "mine" : "ai";
+  if (voice === "mine" && !db.getUserVoice(user.id)) {
+    db.addCredits(user.id, config.costVideo, "Estorno: voz clonada não encontrada");
+    res.status(400).json({ error: "Você ainda não clonou sua voz." });
+    return;
+  }
   db.upsertVideo(generationId, { status: "queued", progress: "", error: null, files: [], cost: config.costVideo });
+  db.setVideoVoice(generationId, voice);
   renderQueue.waiting.push({ generationId, userId: user.id });
   pumpRenderQueue();
   res.status(202).json({ video: videoView(generationId), credits: db.findUserById(user.id)!.credits });
@@ -322,6 +350,86 @@ app.get("/api/generations/:id/media/:file", requireUser, (req, res) => {
   }
   if (req.query.download) res.attachment(`video-${generationId}-${file}`);
   res.sendFile(path.join(mediaDir(generationId), file));
+});
+
+// ---------- Minha voz (clonagem com consentimento) ----------
+const CONSENT_TEXT =
+  "Eu confirmo que esta é a minha própria voz e autorizo o Estúdio Viral IA a criar uma cópia digital dela " +
+  "para narrar os vídeos que eu gerar nesta conta.";
+const voiceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 3 } });
+const voiceLimiter = rateLimiter(5, 60 * 60 * 1000); // até 5 tentativas de clonagem por hora
+
+app.get("/api/voice", requireUser, (req, res) => {
+  const voice = db.getUserVoice(req.user!.id);
+  res.json({
+    available: videoFeatures.voiceClone,
+    voice: voice ? { createdAt: voice.createdAt } : null,
+    consentText: CONSENT_TEXT,
+    minSeconds: MIN_VOICE_SECONDS,
+    cost: config.costVoice,
+  });
+});
+
+app.post("/api/voice", requireUser, voiceUpload.array("audio", 3), async (req, res) => {
+  const user = req.user!;
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  try {
+    if (!videoFeatures.voiceClone) {
+      res.status(503).json({ error: "A clonagem de voz não está disponível no momento." });
+      return;
+    }
+    if (req.body?.consent !== "true") {
+      res.status(400).json({ error: "Você precisa confirmar que a voz é sua e autorizar a clonagem." });
+      return;
+    }
+    if (!files.length || files.some((f) => !/^(audio\/|video\/|application\/octet-stream)/.test(f.mimetype))) {
+      res.status(400).json({ error: "Envie uma gravação de áudio." });
+      return;
+    }
+    if (!voiceLimiter(`user:${user.id}`)) {
+      res.status(429).json({ error: "Muitas tentativas. Tente de novo mais tarde." });
+      return;
+    }
+    if (config.costVoice > 0 && !db.spendCredits(user.id, config.costVoice, "Clonagem de voz")) {
+      res.status(402).json({ error: `Créditos insuficientes. A clonagem custa ${config.costVoice} crédito(s).` });
+      return;
+    }
+
+    try {
+      const old = db.getUserVoice(user.id);
+      const workDir = path.join(os.tmpdir(), `voz-${user.id}-${Date.now()}`);
+      const { voiceId, seconds } = await cloneVoice(
+        user.id,
+        files.map((f) => ({ buffer: f.buffer, originalName: f.originalname })),
+        workDir,
+      );
+      const consent = JSON.stringify({ text: CONSENT_TEXT, at: new Date().toISOString(), ip: req.ip, seconds });
+      db.setUserVoice(user.id, voiceId, consent);
+      if (old) deleteClonedVoice(old.voiceId).catch((e) => console.error("Falha ao apagar voz antiga", e));
+      res.json({ voice: { createdAt: db.getUserVoice(user.id)!.createdAt }, credits: db.findUserById(user.id)!.credits });
+    } catch (err) {
+      if (config.costVoice > 0) db.addCredits(user.id, config.costVoice, "Estorno: falha na clonagem de voz");
+      throw err;
+    }
+  } catch (err) {
+    if (err instanceof VoiceSampleError) {
+      res.status(400).json({ error: `${err.message}${config.costVoice > 0 ? " Seus créditos foram devolvidos." : ""}` });
+      return;
+    }
+    console.error("Falha na clonagem de voz", err);
+    res.status(502).json({
+      error: `Não foi possível clonar a voz. Tente gravar em um lugar silencioso.${config.costVoice > 0 ? " Seus créditos foram devolvidos." : ""}`,
+    });
+  }
+});
+
+app.delete("/api/voice", requireUser, async (req, res) => {
+  const voice = db.getUserVoice(req.user!.id);
+  if (voice) {
+    db.setUserVoice(req.user!.id, null, null);
+    await deleteClonedVoice(voice.voiceId).catch((e) => console.error("Falha ao apagar voz", e));
+  }
+  res.json({ ok: true });
 });
 
 // ---------- Administração ----------

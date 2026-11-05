@@ -221,3 +221,36 @@ export function getGenerationRow(userId: number, id: number) {
     | { id: number; kind: "viral" | "ugc"; title: string; result: string }
     | undefined;
 }
+
+// ---------- Voz clonada do usuário ----------
+function addColumn(table: string, column: string, definition: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+addColumn("users", "voice_id", "TEXT");
+addColumn("users", "voice_created_at", "TEXT");
+addColumn("users", "voice_consent", "TEXT"); // texto do consentimento, data e IP
+addColumn("videos", "voice", "TEXT NOT NULL DEFAULT 'ai'");
+
+export function getUserVoice(userId: number): { voiceId: string; createdAt: string } | null {
+  const row = db.prepare("SELECT voice_id, voice_created_at FROM users WHERE id = ?").get(userId) as
+    | { voice_id: string | null; voice_created_at: string | null }
+    | undefined;
+  return row?.voice_id ? { voiceId: row.voice_id, createdAt: row.voice_created_at ?? "" } : null;
+}
+
+export function setUserVoice(userId: number, voiceId: string | null, consent: string | null): void {
+  db.prepare(
+    `UPDATE users SET voice_id = ?, voice_consent = COALESCE(?, voice_consent),
+       voice_created_at = CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END WHERE id = ?`,
+  ).run(voiceId, consent, voiceId, userId);
+}
+
+export function getVideoVoice(generationId: number): "mine" | "ai" {
+  const row = db.prepare("SELECT voice FROM videos WHERE generation_id = ?").get(generationId) as { voice: string } | undefined;
+  return row?.voice === "mine" ? "mine" : "ai";
+}
+
+export function setVideoVoice(generationId: number, voice: "mine" | "ai"): void {
+  db.prepare("UPDATE videos SET voice = ? WHERE generation_id = ?").run(voice, generationId);
+}

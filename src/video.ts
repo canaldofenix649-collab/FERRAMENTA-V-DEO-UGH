@@ -31,7 +31,62 @@ const VOICE_VIRAL = process.env.ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
 const VOICE_UGC = process.env.ELEVENLABS_VOICE_ID_UGC || "21m00Tcm4TlvDq8ikWAM";
 const TTS_MODEL = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
 
-export const videoFeatures = { aiImages: Boolean(openai), narration: Boolean(elevenlabs) };
+export const videoFeatures = {
+  aiImages: Boolean(openai),
+  narration: Boolean(elevenlabs),
+  voiceClone: Boolean(elevenlabs) && process.env.VOICE_CLONE_ENABLED !== "false",
+};
+
+// ---------- Clonagem de voz (ElevenLabs Instant Voice Cloning) ----------
+export const MIN_VOICE_SECONDS = 20;
+
+/**
+ * Converte as gravações para MP3 limpo (o navegador grava em webm/ogg/mp4),
+ * confere a duração total e cria a voz clonada. Retorna o ID da voz.
+ */
+export async function cloneVoice(
+  userId: number,
+  samples: { buffer: Buffer; originalName: string }[],
+  workDir: string,
+): Promise<{ voiceId: string; seconds: number }> {
+  if (!elevenlabs) throw new Error("Clonagem de voz indisponível.");
+  await fs.mkdir(workDir, { recursive: true });
+  try {
+    const files: Buffer[] = [];
+    let seconds = 0;
+    for (const [i, sample] of samples.entries()) {
+      const input = path.join(workDir, `in-${i}${path.extname(sample.originalName) || ".audio"}`);
+      const output = path.join(workDir, `out-${i}.mp3`);
+      await fs.writeFile(input, sample.buffer);
+      try {
+        await run(FFMPEG, ["-y", "-hide_banner", "-loglevel", "error", "-i", input, "-vn", "-ac", "1", "-ar", "44100", "-b:a", "128k", output]);
+      } catch {
+        throw new VoiceSampleError("Não foi possível ler o arquivo de áudio. Grave novamente ou envie MP3, WAV ou M4A.");
+      }
+      seconds += await mediaDuration(output);
+      files.push(await fs.readFile(output));
+    }
+    if (seconds < MIN_VOICE_SECONDS) {
+      throw new VoiceSampleError(`A gravação tem ${Math.round(seconds)}s. Grave pelo menos ${MIN_VOICE_SECONDS} segundos (o ideal é 1 minuto).`);
+    }
+    const created = await elevenlabs.voices.ivc.create({
+      name: `estudio-user-${userId}`,
+      description: "Voz clonada com consentimento do próprio usuário (Estúdio Viral IA).",
+      files: files.map((data, i) => ({ data, filename: `amostra-${i + 1}.mp3`, contentType: "audio/mpeg" })),
+      removeBackgroundNoise: true,
+    });
+    return { voiceId: created.voiceId, seconds: Math.round(seconds) };
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true });
+  }
+}
+
+export async function deleteClonedVoice(voiceId: string): Promise<void> {
+  if (!elevenlabs) return;
+  await elevenlabs.voices.delete(voiceId);
+}
+
+export class VoiceSampleError extends Error {}
 
 // ---------- Imagem do produto (UGC) ----------
 export async function saveProductImage(generationId: number, buffer: Buffer): Promise<void> {
@@ -201,6 +256,7 @@ export async function renderVideo(
   kind: "viral" | "ugc",
   result: ViralVideo | UgcVideo,
   onProgress: (message: string) => void,
+  options: { voiceId?: string } = {},
 ): Promise<RenderedVideo> {
   const dir = mediaDir(generationId);
   await fs.rm(dir, { recursive: true, force: true });
@@ -208,7 +264,7 @@ export async function renderVideo(
 
   const product = kind === "ugc" ? await loadProductImage(generationId) : null;
   const influencerPrompt = "influencer" in result ? result.influencer.avatar_prompt : "";
-  const voice = kind === "ugc" ? VOICE_UGC : VOICE_VIRAL;
+  const voice = options.voiceId ?? (kind === "ugc" ? VOICE_UGC : VOICE_VIRAL);
   const scenes = result.scenes;
   const files: string[] = [];
   const segments: string[] = [];

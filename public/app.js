@@ -7,6 +7,7 @@ let costs = { viral: 1, ugc: 2, video: 3 };
 let features = { aiImages: false, narration: false };
 let currentId = null; // id da geração exibida
 let videoPoll = null;
+let myVoice = null; // { createdAt } quando o usuário tem voz clonada
 
 // ---------- API ----------
 async function api(url, options = {}) {
@@ -50,6 +51,8 @@ async function init() {
     el.textContent = `(${c} crédito${c === 1 ? "" : "s"})`;
   });
   data.user ? showApp(data.user) : showAuth();
+  $("#btn-voice").classList.toggle("hidden", !(data.user && features.voiceClone));
+  if (data.user && features.voiceClone) loadVoice().catch(() => {});
 }
 
 let authMode = "login";
@@ -77,6 +80,7 @@ $("#form-auth").addEventListener("submit", async (e) => {
     const data = await postJson(authMode === "register" ? "/api/auth/register" : "/api/auth/login", body);
     e.target.reset();
     showApp(data.user);
+    await init();
   } catch (err) {
     statusAuth.className = "status error";
     statusAuth.textContent = err.message;
@@ -89,6 +93,8 @@ $("#btn-logout").addEventListener("click", async () => {
   stop();
   clearTimeout(videoPoll);
   currentId = null;
+  myVoice = null;
+  $("#voice-panel").classList.add("hidden");
   await postJson("/api/auth/logout", {});
   $("#result").classList.add("hidden");
   $("#history").classList.add("hidden");
@@ -317,6 +323,8 @@ function showVideo(video) {
   btn.classList.remove("hidden");
   btn.disabled = false;
 
+  $("#video-voice-wrap").classList.toggle("hidden", !myVoice);
+
   const hint = $("#video-admin-hint");
   const missing = [!features.aiImages && "OPENAI_API_KEY (imagens com IA)", !features.narration && "ELEVENLABS_API_KEY (narração)"].filter(Boolean);
   hint.classList.toggle("hidden", !(me && me.isAdmin && missing.length));
@@ -342,6 +350,7 @@ function showVideo(video) {
     init().catch(() => {});
   } else if (video.status === "done") {
     btn.classList.add("hidden");
+    $("#video-voice-wrap").classList.add("hidden");
     const mp4 = video.files.find((f) => f.name.endsWith(".mp4"));
     const pngs = video.files.filter((f) => f.name.endsWith(".png"));
     if (mp4) {
@@ -366,13 +375,141 @@ $("#btn-video").addEventListener("click", async () => {
   $("#btn-video").disabled = true;
   stop();
   try {
-    const data = await api(`/api/generations/${currentId}/video`, { method: "POST" });
+    const voice = myVoice ? $("#video-voice").value : "ai";
+    const data = await postJson(`/api/generations/${currentId}/video`, { voice });
     updateCredits(data.credits);
     showVideo(data.video);
   } catch (err) {
     $("#btn-video").disabled = false;
     $("#video-status").className = "status error";
     $("#video-status").textContent = err.message;
+  }
+});
+
+// ---------- Minha voz ----------
+let recorder = null;
+let recordedBlob = null;
+let recTimer = null;
+
+async function loadVoice() {
+  const data = await api("/api/voice");
+  myVoice = data.voice;
+  $("#voice-consent-text").textContent = data.consentText;
+  document.querySelectorAll("[data-min]").forEach((el) => (el.textContent = data.minSeconds));
+  $("#voice-cost").textContent = data.cost > 0 ? `(${data.cost} crédito${data.cost === 1 ? "" : "s"})` : "";
+  renderVoiceState();
+  if (currentId) $("#video-voice-wrap").classList.toggle("hidden", !myVoice || $("#btn-video").classList.contains("hidden"));
+}
+
+function renderVoiceState() {
+  const el = $("#voice-current");
+  if (myVoice) {
+    const when = new Date(myVoice.createdAt.replace(" ", "T") + "Z").toLocaleDateString("pt-BR");
+    el.innerHTML = `✅ Sua voz está pronta (criada em ${esc(when)}). Escolha "Minha voz clonada" ao gerar o MP4.
+      <button id="voice-delete" class="link">Excluir minha voz</button>`;
+    $("#voice-submit").firstChild.textContent = "Regravar minha voz ";
+  } else {
+    el.textContent = "Você ainda não clonou sua voz. Grave abaixo para narrar os vídeos com a sua própria voz.";
+    $("#voice-submit").firstChild.textContent = "Clonar minha voz ";
+  }
+}
+
+$("#btn-voice").addEventListener("click", () => {
+  $("#voice-panel").classList.remove("hidden");
+  $("#voice-panel").scrollIntoView({ behavior: "smooth" });
+});
+$("#btn-voice-close").addEventListener("click", () => $("#voice-panel").classList.add("hidden"));
+
+$("#voice-current").addEventListener("click", async (e) => {
+  if (e.target.id !== "voice-delete") return;
+  if (!confirm("Excluir sua voz clonada? Ela será apagada definitivamente.")) return;
+  await api("/api/voice", { method: "DELETE" });
+  myVoice = null;
+  renderVoiceState();
+  if (currentId) $("#video-voice-wrap").classList.add("hidden");
+});
+
+function setRecorded(blob) {
+  recordedBlob = blob;
+  const audio = $("#rec-audio");
+  audio.src = URL.createObjectURL(blob);
+  audio.hidden = false;
+}
+
+$("#rec-start").addEventListener("click", async () => {
+  const status = $("#voice-status");
+  status.className = "status";
+  status.textContent = "";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    const chunks = [];
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    recorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setRecorded(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }));
+      $("#voice-file").value = "";
+    };
+    recorder.start();
+    const started = Date.now();
+    $(".recorder").classList.add("recording");
+    $("#rec-start").disabled = true;
+    $("#rec-stop").disabled = false;
+    recTimer = setInterval(() => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      $("#rec-timer").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      if (s >= 180) $("#rec-stop").click(); // máximo de 3 minutos
+    }, 250);
+  } catch {
+    status.className = "status error";
+    status.textContent = "Não foi possível acessar o microfone. Permita o acesso no navegador ou envie um arquivo.";
+  }
+});
+
+$("#rec-stop").addEventListener("click", () => {
+  if (recorder && recorder.state !== "inactive") recorder.stop();
+  clearInterval(recTimer);
+  $(".recorder").classList.remove("recording");
+  $("#rec-start").disabled = false;
+  $("#rec-stop").disabled = true;
+});
+
+$("#voice-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) setRecorded(file);
+});
+
+$("#voice-submit").addEventListener("click", async () => {
+  const status = $("#voice-status");
+  status.className = "status error";
+  if (!recordedBlob) return (status.textContent = "Grave ou envie um áudio primeiro.");
+  if (!$("#voice-consent").checked) return (status.textContent = "Marque a confirmação de que a voz é sua.");
+
+  const ext = (recordedBlob.type.split("/")[1] || "webm").split(";")[0];
+  const form = new FormData();
+  form.append("audio", recordedBlob, recordedBlob.name || `gravacao.${ext}`);
+  form.append("consent", "true");
+  const btn = $("#voice-submit");
+  btn.disabled = true;
+  status.className = "status";
+  status.textContent = "Clonando sua voz... isso leva alguns segundos.";
+  try {
+    const data = await api("/api/voice", { method: "POST", body: form });
+    myVoice = data.voice;
+    updateCredits(data.credits);
+    renderVoiceState();
+    recordedBlob = null;
+    $("#rec-audio").hidden = true;
+    $("#voice-file").value = "";
+    $("#rec-timer").textContent = "0:00";
+    $("#voice-consent").checked = false;
+    status.textContent = "Pronto! Agora escolha \"Minha voz clonada\" ao gerar o vídeo MP4.";
+    if (currentId && !$("#btn-video").classList.contains("hidden")) $("#video-voice-wrap").classList.remove("hidden");
+  } catch (err) {
+    status.className = "status error";
+    status.textContent = err.message;
+  } finally {
+    btn.disabled = false;
   }
 });
 

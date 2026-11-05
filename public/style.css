@@ -139,3 +139,12 @@ a.button {
   display: inline-block; background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff;
   border-radius: 10px; padding: 10px 14px; font-weight: 600;
 }
+
+/* ---------- Minha voz ---------- */
+.voice-script p { margin: 0 0 8px; }
+.recorder { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rec-timer { font-variant-numeric: tabular-nums; color: var(--muted); }
+.recording .rec-timer { color: #ff6b6b; font-weight: 700; }
+label.check { display: flex; gap: 10px; align-items: flex-start; color: var(--text); }
+label.check input { width: auto; margin-top: 4px; }
+audio { width: 100%; }

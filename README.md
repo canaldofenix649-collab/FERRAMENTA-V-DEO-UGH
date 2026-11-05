@@ -31,6 +31,7 @@ Depois, crie uma conta no site **com o mesmo e-mail do `ADMIN_EMAIL`**. Essa con
 | Histórico | Cada vídeo gerado fica salvo em "Meus vídeos" para abrir de novo ou excluir |
 | Painel admin (`/admin.html`) | Lista de usuários, busca, quantos vídeos cada um gerou e botão para **adicionar ou remover créditos** (use número negativo para remover) |
 | Vídeo MP4 | Botão em cada vídeo gerado. Custa `COST_VIDEO` (3) créditos, roda em segundo plano e estorna se falhar |
+| Minha voz | O usuário grava a própria voz pelo navegador (ou envia um áudio) e a ferramenta clona com a ElevenLabs. Depois ele escolhe "Minha voz clonada" ao gerar o MP4 |
 | Proteções | Limite de tentativas de login, até 10 gerações por minuto por usuário, uma geração por vez e imagem de no máximo 5 MB |
 
 Enquanto o pagamento automático não estiver integrado, a venda pode ser manual: o cliente paga (Pix, Hotmart, Kiwify...) e você adiciona os créditos pelo painel admin.
@@ -73,6 +74,23 @@ docker run -p 3000:3000 -v estudio-data:/data --env-file .env estudio-viral
 Cada cena dura exatamente o tempo da narração, então as legendas ficam sincronizadas. A imagem recebe um zoom lento (efeito Ken Burns), como nos Shorts.
 
 Custo aproximado por vídeo de 6 a 8 cenas: imagens de US$ 0,05 a 0,30 cada (depende de `OPENAI_IMAGE_QUALITY`) e narração de alguns centavos. Confira os preços atuais em cada serviço e ajuste `COST_VIDEO`.
+
+## Clonagem de voz
+
+1. Em **Minha voz**, o usuário lê um texto em voz alta por pelo menos 20 segundos (o ideal é 1 minuto). O texto começa com uma frase de autorização.
+2. Ele marca a confirmação de que a voz é dele. O servidor converte o áudio, confere a duração e cria a voz na ElevenLabs.
+3. Ao gerar o MP4, ele escolhe **Minha voz clonada** e o vídeo sai narrado com a voz dele.
+
+Cuidados que já estão no código:
+
+- cada conta tem **uma única voz**, que só ela pode usar; regravar apaga a anterior;
+- o consentimento (texto, data, IP e duração) fica registrado no banco;
+- o usuário pode **excluir a voz** a qualquer momento, e ela é apagada também na ElevenLabs;
+- há limite de 5 tentativas de clonagem por hora.
+
+A clonagem de voz exige um plano pago na ElevenLabs, e cada plano tem um limite de vozes personalizadas. Confira o seu antes de liberar para muitos clientes. Para desativar, use `VOICE_CLONE_ENABLED=false`. Para cobrar, use `COST_VOICE_CLONE`.
+
+Deixe claro nos seus termos de uso que é proibido clonar a voz de outra pessoa sem autorização.
 
 ## Chaves de API: onde ficam
 
