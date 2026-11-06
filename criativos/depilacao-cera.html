@@ -1,0 +1,340 @@
+<title>Depilação na Cera</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Archivo:wght@400;600;800&family=DM+Mono:wght@500&display=swap">
+<style>
+/* Layout: palco fixo 1920x1080 (TV 16:9) escalado para caber na tela; slides em loop com faixa de cera que escorre do topo. Visual escuro único, de propósito, para TV. */
+:root {
+  --ink: #120d0b;        /* fundo: couro escuro */
+  --leather: #24170f;    /* superfície */
+  --wax: #f2a93b;        /* cera quente (âmbar) */
+  --wax-deep: #c9761c;   /* cera mais escura */
+  --cream: #f6ead8;      /* texto */
+  --muted: #b39d84;      /* texto secundário */
+  --display: "Big Shoulders Display", "Impact", "Arial Narrow", sans-serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "DM Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0; background: #000; color: var(--cream);
+  font-family: var(--body); overflow: hidden;
+  padding-left: max(0px, env(safe-area-inset-left, 0px));
+  padding-right: max(0px, env(safe-area-inset-right, 0px));
+}
+#viewport { position: fixed; inset: 0; background: #000; overflow: hidden; }
+#stage {
+  width: 1920px; height: 1080px; position: relative; overflow: hidden;
+  background:
+    radial-gradient(1200px 700px at 78% 60%, rgba(242,169,59,.10), transparent 60%),
+    radial-gradient(900px 600px at 10% 100%, rgba(201,118,28,.10), transparent 60%),
+    var(--ink);
+  position: absolute; left: 50%; top: 50%; transform-origin: center center;
+}
+
+/* Faixa de cera escorrendo */
+#drip { position: absolute; top: 0; left: 0; width: 100%; height: 220px; z-index: 5; pointer-events: none; }
+
+/* Marca d'água discreta */
+.corner {
+  position: absolute; z-index: 6; bottom: 56px; left: 96px;
+  font-family: var(--mono); font-size: 22px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted);
+}
+.corner b { color: var(--wax); font-weight: 500; }
+
+/* Progresso */
+#progress { position: absolute; z-index: 6; bottom: 56px; right: 96px; display: flex; gap: 12px; }
+#progress span { width: 64px; height: 6px; border-radius: 3px; background: rgba(246,234,216,.15); overflow: hidden; }
+#progress span i { display: block; height: 100%; width: 0; background: var(--wax); }
+
+/* Slides */
+.slide {
+  position: absolute; inset: 0; padding: 240px 96px 150px;
+  display: flex; flex-direction: column; justify-content: center;
+  opacity: 0; visibility: hidden; transition: opacity .6s ease, visibility 0s linear .6s;
+}
+.slide.on { opacity: 1; visibility: visible; transition: opacity .6s ease; }
+.slide .in { opacity: 0; transform: translateY(40px); }
+.slide.on .in { animation: rise .8s cubic-bezier(.2,.8,.2,1) forwards; }
+.slide.on .in.d1 { animation-delay: .15s; }
+.slide.on .in.d2 { animation-delay: .45s; }
+.slide.on .in.d3 { animation-delay: .8s; }
+.slide.on .in.d4 { animation-delay: 1.15s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+
+.eyebrow {
+  font-family: var(--mono); font-size: 30px; letter-spacing: .2em; text-transform: uppercase; color: var(--wax);
+}
+.huge {
+  font-family: var(--display); font-weight: 900; text-transform: uppercase;
+  font-size: 230px; line-height: .86; letter-spacing: -.01em; margin: 0;
+}
+.big {
+  font-family: var(--display); font-weight: 900; text-transform: uppercase;
+  font-size: 170px; line-height: .88; margin: 0;
+}
+.wax-text { color: var(--wax); }
+.lead { font-size: 52px; line-height: 1.25; color: var(--muted); max-width: 26ch; margin: 36px 0 0; font-weight: 400; }
+.lead strong { color: var(--cream); font-weight: 800; }
+
+/* Slide 1: gancho */
+.s-hook .huge { font-size: 260px; }
+.s-hook .answer {
+  margin-top: 48px; display: inline-flex; align-self: flex-start; align-items: center; gap: 28px;
+  background: var(--wax); color: var(--ink); padding: 22px 44px 22px 36px; border-radius: 999px;
+  font-family: var(--display); font-weight: 900; font-size: 84px; text-transform: uppercase; line-height: 1;
+}
+
+/* Slide 2: título do serviço */
+.s-title { align-items: flex-start; }
+.s-title .huge span { display: block; }
+.s-title .tags { display: flex; gap: 24px; margin-top: 56px; }
+.tag {
+  font-family: var(--display); font-weight: 700; font-size: 72px; text-transform: uppercase; line-height: 1;
+  border: 4px solid var(--wax); color: var(--wax); padding: 18px 40px 14px; border-radius: 16px;
+}
+
+/* Slides 3 e 4: área */
+.s-area { flex-direction: row; align-items: center; gap: 96px; }
+.s-area .txt { flex: 1; min-width: 0; }
+.s-area .art { width: 640px; height: 640px; flex: none; position: relative; }
+.ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, var(--leather), var(--ink) 70%);
+  border: 3px solid rgba(242,169,59,.35);
+}
+.ring::after {
+  content: ""; position: absolute; inset: -26px; border-radius: 50%;
+  border: 2px dashed rgba(242,169,59,.25); animation: spin 40s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.steps { list-style: none; padding: 0; margin: 48px 0 0; display: grid; gap: 22px; }
+.steps li { display: flex; align-items: baseline; gap: 28px; font-size: 46px; font-weight: 600; }
+.steps li em {
+  font-style: normal; font-family: var(--mono); font-size: 28px; color: var(--wax);
+  border: 2px solid var(--wax); border-radius: 8px; padding: 4px 12px; flex: none;
+}
+
+/* Slide 5: benefícios */
+.s-why .big { font-size: 140px; }
+.s-why .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 56px; }
+.card {
+  background: var(--leather); border-radius: 28px; padding: 52px 48px 56px;
+  border-top: 8px solid var(--wax);
+}
+.card .n { font-family: var(--display); font-weight: 900; font-size: 140px; line-height: .9; color: var(--wax); }
+.card .n small { font-size: 60px; }
+.card h3 { font-family: var(--display); font-weight: 700; font-size: 60px; text-transform: uppercase; margin: 18px 0 10px; line-height: 1; }
+.card p { font-size: 34px; line-height: 1.3; color: var(--muted); margin: 0; }
+
+/* Slide 6: chamada */
+.s-cta { align-items: center; text-align: center; }
+.s-cta .huge { font-size: 210px; }
+.s-cta .lead { max-width: 30ch; margin-inline: auto; }
+.s-cta .pill {
+  margin-top: 56px; background: var(--wax); color: var(--ink);
+  font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: 88px; line-height: 1;
+  padding: 30px 64px 26px; border-radius: 999px; box-shadow: 0 0 0 0 rgba(242,169,59,.5);
+}
+.slide.on .pill { animation: rise .8s cubic-bezier(.2,.8,.2,1) .8s forwards, pulse 2s ease-out 1.8s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(242,169,59,.55); } 100% { box-shadow: 0 0 0 40px rgba(242,169,59,0); } }
+
+/* Botão tela cheia */
+#fs {
+  position: fixed; z-index: 20; top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  font: 600 14px var(--body); color: var(--cream); background: rgba(36,23,15,.85);
+  border: 1px solid rgba(242,169,59,.5); border-radius: 999px; padding: 10px 18px; cursor: pointer;
+  transition: opacity .4s;
+}
+#fs:focus-visible { outline: 2px solid var(--wax); outline-offset: 2px; }
+body.idle #fs { opacity: 0; pointer-events: none; }
+body.idle { cursor: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide.on .in, .slide.on .pill { animation: none; opacity: 1; transform: none; }
+  .ring::after { animation: none; }
+}
+</style>
+
+<div id="viewport">
+  <div id="stage">
+    <canvas id="drip" width="1920" height="220"></canvas>
+
+    <!-- 1. Gancho -->
+    <section class="slide s-hook on">
+      <div class="eyebrow in d1">Repara no espelho</div>
+      <h1 class="huge in d2">Pelo no nariz?<br><span class="wax-text">Na orelha?</span></h1>
+      <div class="answer in d3">A gente resolve na cera</div>
+    </section>
+
+    <!-- 2. Serviço -->
+    <section class="slide s-title">
+      <div class="eyebrow in d1">Novo no cardápio da barbearia</div>
+      <h2 class="huge in d2"><span>Depilação</span><span class="wax-text">na cera</span></h2>
+      <div class="tags in d3"><span class="tag">Nariz</span><span class="tag">Orelha</span></div>
+    </section>
+
+    <!-- 3. Nariz -->
+    <section class="slide s-area">
+      <div class="txt">
+        <div class="eyebrow in d1">Nariz</div>
+        <h2 class="big in d2">Tira pela <span class="wax-text">raiz.</span></h2>
+        <ul class="steps">
+          <li class="in d3"><em>01</em>Cera quente nas narinas</li>
+          <li class="in d3"><em>02</em>Espera firmar alguns segundos</li>
+          <li class="in d4"><em>03</em>Um puxão e pronto, limpo</li>
+        </ul>
+      </div>
+      <div class="art in d2" aria-hidden="true">
+        <div class="ring"></div>
+        <svg viewBox="0 0 640 640">
+          <!-- perfil de nariz -->
+          <path d="M260 120 C 300 220, 330 300, 410 380 C 440 410, 430 450, 390 455 C 360 458, 345 440, 320 445 C 300 450, 290 470, 260 470"
+                fill="none" stroke="#f6ead8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+          <ellipse cx="365" cy="432" rx="26" ry="12" fill="#f2a93b"/>
+          <path d="M365 444 q -4 30 2 60" stroke="#f2a93b" stroke-width="10" stroke-linecap="round" fill="none"/>
+          <circle cx="367" cy="512" r="9" fill="#f2a93b"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- 4. Orelha -->
+    <section class="slide s-area">
+      <div class="txt">
+        <div class="eyebrow in d1">Orelha</div>
+        <h2 class="big in d2">Orelha limpa <span class="wax-text">também é visual.</span></h2>
+        <p class="lead in d3">Aqueles pelinhos na borda e na entrada da orelha saem <strong>de uma vez</strong>, sem ficar a pontinha da tesoura.</p>
+      </div>
+      <div class="art in d2" aria-hidden="true">
+        <div class="ring"></div>
+        <svg viewBox="0 0 640 640">
+          <!-- orelha -->
+          <path d="M260 470 C 220 420, 200 330, 230 250 C 260 170, 340 140, 400 170 C 460 200, 470 280, 430 330 C 400 370, 380 380, 380 420 C 380 470, 330 500, 290 480"
+                fill="none" stroke="#f6ead8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M300 300 C 300 250, 350 230, 380 260 C 400 285, 370 310, 345 320"
+                fill="none" stroke="#f6ead8" stroke-width="10" stroke-linecap="round"/>
+          <path d="M262 250 C 280 180, 360 160, 410 190" fill="none" stroke="#f2a93b" stroke-width="22" stroke-linecap="round" opacity=".9"/>
+          <circle cx="330" cy="335" r="16" fill="#f2a93b"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- 5. Benefícios -->
+    <section class="slide s-why">
+      <div class="eyebrow in d1">Por que na cera</div>
+      <h2 class="big in d2">Rápido, limpo <span class="wax-text">e dura mais.</span></h2>
+      <div class="grid">
+        <div class="card in d2"><div class="n">5<small>min</small></div><h3>Rapidinho</h3><p>Dá pra fazer junto com o corte ou a barba.</p></div>
+        <div class="card in d3"><div class="n">100%</div><h3>Pela raiz</h3><p>O pelo sai inteiro e demora bem mais pra voltar.</p></div>
+        <div class="card in d4"><div class="n">1×</div><h3>Uso único</h3><p>Aplicador descartável para cada cliente.</p></div>
+      </div>
+    </section>
+
+    <!-- 6. Chamada -->
+    <section class="slide s-cta">
+      <div class="eyebrow in d1">Já que você está aqui</div>
+      <h2 class="huge in d2">Fecha o visual<br><span class="wax-text">completo.</span></h2>
+      <p class="lead in d3">Corte, barba e <strong>depilação de nariz e orelha</strong> na mesma cadeira.</p>
+      <div class="pill">Peça ao seu barbeiro</div>
+    </section>
+
+    <div class="corner">Barbearia · <b>Depilação na cera</b></div>
+    <div id="progress"></div>
+  </div>
+</div>
+
+<button id="fs" type="button">Tela cheia</button>
+
+<script>
+(function () {
+  const DURATIONS = [6000, 6000, 7000, 7000, 8000, 7000];
+  const stage = document.getElementById('stage');
+  const slides = [...document.querySelectorAll('.slide')];
+  const progress = document.getElementById('progress');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Escala o palco 1920x1080 para caber na tela
+  function fit() {
+    const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.transform = 'translate(-50%, -50%) scale(' + s + ')';
+  }
+  addEventListener('resize', fit); fit();
+
+  // Barra de progresso
+  const bars = slides.map(() => {
+    const span = document.createElement('span'); const i = document.createElement('i');
+    span.appendChild(i); progress.appendChild(span); return i;
+  });
+
+  let idx = 0, start = performance.now();
+  function show(n) {
+    slides[idx].classList.remove('on');
+    // reinicia animações
+    void slides[n].offsetWidth;
+    idx = n; slides[idx].classList.add('on');
+    start = performance.now();
+    bars.forEach((b, k) => b.style.width = k < idx ? '100%' : '0');
+  }
+
+  // Cera escorrendo (canvas)
+  const cv = document.getElementById('drip'); const ctx = cv.getContext('2d');
+  const drops = Array.from({ length: 14 }, (_, k) => ({
+    x: 60 + k * 140 + Math.random() * 60, w: 22 + Math.random() * 26,
+    len: 20 + Math.random() * 90, speed: .25 + Math.random() * .5, ph: Math.random() * 6.28
+  }));
+  function drawDrip(t) {
+    ctx.clearRect(0, 0, 1920, 220);
+    const g = ctx.createLinearGradient(0, 0, 0, 200);
+    g.addColorStop(0, '#c9761c'); g.addColorStop(1, '#f2a93b');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1920, 0); ctx.lineTo(1920, 26);
+    for (let x = 1920; x >= 0; x -= 40) ctx.lineTo(x, 26 + Math.sin(x / 90 + t / 1400) * 6);
+    ctx.closePath(); ctx.fill();
+    drops.forEach(d => {
+      const L = reduce ? d.len : d.len + Math.sin(t / 1000 * d.speed + d.ph) * 28;
+      ctx.beginPath();
+      ctx.moveTo(d.x - d.w / 2, 20);
+      ctx.lineTo(d.x - d.w / 2, 20 + L);
+      ctx.arc(d.x, 20 + L, d.w / 2, Math.PI, 0, true);
+      ctx.lineTo(d.x + d.w / 2, 20);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,210,.35)';
+      ctx.beginPath(); ctx.ellipse(d.x - d.w / 5, 20 + L - 2, d.w / 9, d.w / 5, 0, 0, 6.28); ctx.fill();
+      ctx.fillStyle = g;
+    });
+  }
+
+  function loop(now) {
+    const el = now - start, dur = DURATIONS[idx];
+    bars[idx].style.width = Math.min(100, el / dur * 100) + '%';
+    if (el >= dur) show((idx + 1) % slides.length);
+    drawDrip(now);
+    requestAnimationFrame(loop);
+  }
+  show(0); requestAnimationFrame(loop);
+
+  // Tela cheia + manter tela acesa
+  const fsBtn = document.getElementById('fs');
+  fsBtn.addEventListener('click', () => {
+    const el = document.documentElement;
+    const p = document.fullscreenElement ? document.exitFullscreen() : (el.requestFullscreen ? el.requestFullscreen() : null);
+    if (p && p.catch) p.catch(() => {});
+  });
+  async function wake() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {} }
+  wake(); document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+
+  // Esconde botão e cursor quando o mouse fica parado
+  let t;
+  function poke() { document.body.classList.remove('idle'); clearTimeout(t); t = setTimeout(() => document.body.classList.add('idle'), 3000); }
+  addEventListener('mousemove', poke); addEventListener('keydown', poke); poke();
+
+  // Setas do teclado / controle remoto para trocar o slide
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') show((idx + 1) % slides.length);
+    if (e.key === 'ArrowLeft') show((idx - 1 + slides.length) % slides.length);
+  });
+})();
+</script>
