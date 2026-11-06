@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Archivo:wght@400;600;800&family=DM+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Archivo:wght@400;600;800&family=DM+Mono:wght@500&family=Kaushan+Script&display=swap">
 <style>
 /* Layout: palco fixo 1920x1080 (TV 16:9) escalado para caber na tela; slides em loop com faixa de cera que escorre do topo. Visual escuro único, de propósito, para TV. */
 :root {
@@ -42,7 +42,23 @@ body {
   position: absolute; z-index: 6; bottom: 56px; left: 96px;
   font-family: var(--mono); font-size: 22px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted);
 }
-.corner b { color: var(--wax); font-weight: 500; font-size: 26px; }
+.corner { display: flex; align-items: center; gap: 22px; bottom: 44px; }
+.logo { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; color: var(--cream); }
+.logo small { font-family: var(--mono); font-size: .3em; letter-spacing: .45em; margin-right: -.45em; text-transform: uppercase; }
+.logo span { font-family: "Kaushan Script", "Brush Script MT", cursive; text-transform: none; letter-spacing: 0; transform: rotate(-4deg); text-shadow: 0 .06em 0 rgba(60,0,6,.45); }
+.logo.sm { font-size: 46px; }
+.logo.sm span { margin-top: -4px; }
+.logo.lg { font-size: 120px; margin-bottom: 24px; }
+.logo.lg span { margin-top: -.05em; }
+.sep-dot { color: var(--muted); }
+.logo small { margin-bottom: .35em; }
+.logo span { margin-top: 0 !important; }
+.logo.lg { font-size: 92px; margin-bottom: 34px; }
+.slide.s-cta { padding-top: 190px; padding-bottom: 160px; }
+.slide.s-cta .huge { font-size: 140px; }
+.slide.s-cta .lead { max-width: none; }
+.slide.s-cta .lead { font-size: 42px; margin-top: 24px; }
+.slide.s-cta .pill { margin-top: 36px; font-size: 72px; padding: 24px 56px 20px; }
 
 /* Progresso */
 #progress { position: absolute; z-index: 6; bottom: 56px; right: 96px; display: flex; gap: 12px; }
@@ -253,13 +269,13 @@ body.idle { cursor: none; }
 
     <!-- 6. Chamada -->
     <section class="slide s-cta">
-      <div class="eyebrow in d1">Barbearia Negueba Show</div>
+      <div class="logo lg in d1"><small>Barbearia</small><span>Negueba Show</span></div>
       <h2 class="huge in d2">Fecha o visual<br><span class="wax-text">completo.</span></h2>
       <p class="lead in d3">Corte, barba e <strong>depilação de nariz e ouvido</strong> na mesma cadeira.</p>
       <div class="pill">Peça ao seu barbeiro</div>
     </section>
 
-    <div class="corner"><b>Barbearia Negueba Show</b> · Depilação na cera</div>
+    <div class="corner"><span class="logo sm"><small>Barbearia</small><span>Negueba Show</span></span><span class="sep-dot">·</span>Depilação na cera</div>
     <div id="progress"></div>
   </div>
 </div>
