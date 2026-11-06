@@ -108,6 +108,15 @@ body {
 .s-hook .huge, .s-fix .huge { font-size: 220px; }
 .s-hook .answer, .s-fix .answer { margin-top: 48px; display: inline-flex; align-items: center; gap: 24px; background: var(--wax); color: var(--ink); padding: 22px 44px; border-radius: 999px; font-family: var(--display); font-weight: 900; font-size: 84px; text-transform: uppercase; line-height: 1; }
 
+.duo { display: flex; gap: 24px; flex: none; }
+.s-fix .duo .nose-art { width: 470px; height: 470px; }
+.s-fix .txt { flex: 1 1 auto; min-width: 0; }
+.s-fix .answer { white-space: nowrap; }
+.s-area.s-fix .huge { font-size: 190px; }
+.s-fix .answer { font-size: 70px; }
+.slide.on .strip.l { animation-name: yankL; }
+@keyframes yankL { 0%, 35% { transform: translate(0,0) rotate(0); } 60% { transform: translate(-170px,-200px) rotate(26deg); } 100% { transform: translate(-180px,-210px) rotate(22deg); } }
+
 /* Slide 2: título do serviço */
 .s-title { align-items: flex-start; }
 .s-title .huge span { display: block; }
@@ -184,7 +193,7 @@ body.idle { cursor: none; }
   <div id="stage">
     <canvas id="drip" width="1920" height="220"></canvas>
 
-    <!-- 1. Gancho: nariz cheio de pelo -->
+    <!-- 1. Gancho: nariz -->
     <section class="slide s-area s-hook">
       <div class="txt">
         <div class="eyebrow in d1">Repara no espelho</div>
@@ -196,45 +205,36 @@ body.idle { cursor: none; }
       </div>
     </section>
 
-    <!-- 2. Solução: 10 minutos -->
+    <!-- 2. Gancho: ouvido -->
+    <section class="slide s-area s-hook">
+      <div class="txt">
+        <div class="eyebrow in d1">E não para por aí</div>
+        <h2 class="huge in d2">Pelos<br><span class="wax-text">no ouvido?</span></h2>
+      </div>
+      <div class="art nose-art pop" aria-hidden="true">
+        <div class="disc"></div>
+        <svg class="ear hairy" viewBox="0 0 640 640"></svg>
+      </div>
+    </section>
+
+    <!-- 3. Solução: os dois, 10 minutos -->
     <section class="slide s-area s-fix">
       <div class="txt">
         <div class="eyebrow in d1">Relaxa</div>
-        <h2 class="huge in d2">Temos a<br><span class="wax-text">solução.</span></h2>
+        <h2 class="huge in d2">Temos&nbsp;a<br><span class="wax-text">solução.</span></h2>
         <div class="answer in d3">Rapidinho <span class="sep"></span> 10 minutos</div>
       </div>
-      <div class="art nose-art" aria-hidden="true">
-        <div class="disc"></div>
-        <svg class="nose clean" viewBox="0 0 640 640"></svg>
+      <div class="duo">
+        <div class="art nose-art in d1" aria-hidden="true"><div class="disc"></div><svg class="nose clean" viewBox="0 0 640 640"></svg></div>
+        <div class="art nose-art in d2" aria-hidden="true"><div class="disc"></div><svg class="ear clean" viewBox="0 0 640 640"></svg></div>
       </div>
     </section>
 
-    <!-- 3. Serviço -->
+    <!-- 4. Serviço -->
     <section class="slide s-title">
       <div class="eyebrow in d1">Depilação na cera</div>
-      <h2 class="huge in d2"><span>Nariz e orelha</span><span class="wax-text">limpos de vez.</span></h2>
-      <div class="tags in d3"><span class="tag">Nariz</span><span class="tag">Orelha</span></div>
-    </section>
-
-    <!-- 4. Orelha -->
-    <section class="slide s-area">
-      <div class="txt">
-        <div class="eyebrow in d1">Orelha</div>
-        <h2 class="big in d2">Orelha limpa <span class="wax-text">também é visual.</span></h2>
-        <p class="lead in d3">Aqueles pelinhos na borda e na entrada da orelha saem <strong>de uma vez</strong>, sem ficar a pontinha da tesoura.</p>
-      </div>
-      <div class="art in d2" aria-hidden="true">
-        <div class="ring"></div>
-        <svg viewBox="0 0 640 640">
-          <!-- orelha -->
-          <path d="M260 470 C 220 420, 200 330, 230 250 C 260 170, 340 140, 400 170 C 460 200, 470 280, 430 330 C 400 370, 380 380, 380 420 C 380 470, 330 500, 290 480"
-                fill="none" stroke="#f6ead8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M300 300 C 300 250, 350 230, 380 260 C 400 285, 370 310, 345 320"
-                fill="none" stroke="#f6ead8" stroke-width="10" stroke-linecap="round"/>
-          <path d="M262 250 C 280 180, 360 160, 410 190" fill="none" stroke="#f2a93b" stroke-width="22" stroke-linecap="round" opacity=".9"/>
-          <circle cx="330" cy="335" r="16" fill="#f2a93b"/>
-        </svg>
-      </div>
+      <h2 class="huge in d2"><span>Nariz e ouvido</span><span class="wax-text">limpos de vez.</span></h2>
+      <div class="tags in d3"><span class="tag">Nariz</span><span class="tag">Ouvido</span></div>
     </section>
 
     <!-- 5. Benefícios -->
@@ -252,7 +252,7 @@ body.idle { cursor: none; }
     <section class="slide s-cta">
       <div class="eyebrow in d1">Já que você está aqui</div>
       <h2 class="huge in d2">Fecha o visual<br><span class="wax-text">completo.</span></h2>
-      <p class="lead in d3">Corte, barba e <strong>depilação de nariz e orelha</strong> na mesma cadeira.</p>
+      <p class="lead in d3">Corte, barba e <strong>depilação de nariz e ouvido</strong> na mesma cadeira.</p>
       <div class="pill">Peça ao seu barbeiro</div>
     </section>
 
@@ -265,7 +265,7 @@ body.idle { cursor: none; }
 
 <script>
 (function () {
-  const DURATIONS = [7000, 7000, 6000, 7000, 8000, 7000];
+  const DURATIONS = [6500, 6500, 8000, 6000, 8000, 7000];
   const stage = document.getElementById('stage');
   const slides = [...document.querySelectorAll('.slide')];
   const progress = document.getElementById('progress');
@@ -279,20 +279,34 @@ body.idle { cursor: none; }
   addEventListener('resize', fit); fit();
 
 
-  // Desenha o nariz (de frente) com ou sem pelos
+  // Desenha nariz e ouvido, com ou sem pelos
   const NS = 'http://www.w3.org/2000/svg';
   function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
   let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  function hairs(g, cx, cy, n, dir, delay0) {
+  // pelos saindo de (cx,cy) na direção base 'ang' com abertura 'spread'
+  function hairs(g, cx, cy, n, ang0, spread, lmin, lvar, jx, jy, delay0) {
     for (let i = 0; i < n; i++) {
-      const sx = cx + (rnd() - .5) * 50, sy = cy + (rnd() - .3) * 14;
-      const ang = Math.PI / 2 + dir * (rnd() * .9) + (rnd() - .5) * .5;
-      const len = 60 + rnd() * 110, curl = (rnd() - .5) * 70;
+      const sx = cx + (rnd() - .5) * jx, sy = cy + (rnd() - .5) * jy;
+      const ang = ang0 + (rnd() - .5) * spread;
+      const len = lmin + rnd() * lvar, curl = (rnd() - .5) * 60;
       const ex = sx + Math.cos(ang) * len, ey = sy + Math.sin(ang) * len;
-      const mx = (sx + ex) / 2 + curl, my = (sy + ey) / 2;
+      const mx = (sx + ex) / 2 - Math.sin(ang) * curl, my = (sy + ey) / 2 + Math.cos(ang) * curl;
       const h = el('path', { d: `M${sx} ${sy} Q${mx} ${my} ${ex} ${ey}`, class: 'hair', pathLength: 1, 'stroke-width': (3 + rnd() * 3).toFixed(1) }, g);
       h.style.animationDelay = (delay0 + rnd() * 1.4).toFixed(2) + 's';
     }
+  }
+  function waxStrip(svg, x, y, w, h, rot, extra) {
+    const strip = el('g', { class: 'strip ' + (extra || '') }, svg);
+    el('rect', { x, y, width: w, height: h, rx: 24, fill: '#f2a93b', stroke: '#c9761c', 'stroke-width': 6, transform: `rotate(${rot} ${x + w / 2} ${y + h / 2})` }, strip);
+    const hg = el('g', { transform: `rotate(${rot} ${x + w / 2} ${y + h / 2})` }, strip);
+    for (let i = 0; i < Math.round(w / 8); i++) {
+      const hx = x + 14 + rnd() * (w - 28), hy = y + 16 + rnd() * (h - 32), l = 14 + rnd() * 24, c = (rnd() - .5) * 16;
+      el('path', { d: `M${hx} ${hy} q ${c} ${l / 2} ${c / 2} ${l}`, class: 'hair', pathLength: 1, 'stroke-width': 3.5 }, hg);
+    }
+  }
+  function sparks(svg, pts) {
+    pts.forEach(([x, y, k]) =>
+      el('path', { d: `M${x} ${y - 30} L${x + 9} ${y - 9} L${x + 30} ${y} L${x + 9} ${y + 9} L${x} ${y + 30} L${x - 9} ${y + 9} L${x - 30} ${y} L${x - 9} ${y - 9} Z`, class: 'spark ' + k }, svg));
   }
   function drawNose(svg, hairy) {
     el('path', { d: 'M282 70 C 278 190, 262 290, 222 370 C 182 420, 168 478, 208 512 C 236 534, 268 522, 290 512 C 306 530, 334 530, 350 512 C 372 522, 404 534, 432 512 C 472 478, 458 420, 418 370 C 378 290, 362 190, 358 70', fill: '#e6b088', stroke: '#7a4a2c', 'stroke-width': 10, 'stroke-linejoin': 'round' }, svg);
@@ -301,20 +315,29 @@ body.idle { cursor: none; }
     el('ellipse', { cx: 378, cy: 486, rx: 34, ry: 17, transform: 'rotate(18 378 486)', fill: '#3a2216' }, svg);
     if (hairy) {
       const g = el('g', {}, svg);
-      hairs(g, 262, 488, 26, 1, 1.1); hairs(g, 378, 488, 26, -1, 1.1);
+      hairs(g, 262, 490, 26, Math.PI / 2 + .35, 1.1, 60, 110, 50, 12, 1.1);
+      hairs(g, 378, 490, 26, Math.PI / 2 - .35, 1.1, 60, 110, 50, 12, 1.1);
     } else {
-      const strip = el('g', { class: 'strip' }, svg);
-      el('rect', { x: 200, y: 470, width: 240, height: 70, rx: 24, fill: '#f2a93b', stroke: '#c9761c', 'stroke-width': 6 }, strip);
-      const hg = el('g', {}, strip);
-      for (let i = 0; i < 30; i++) {
-        const x = 214 + rnd() * 212, y = 490 + rnd() * 34, l = 14 + rnd() * 26, c = (rnd() - .5) * 16;
-        el('path', { d: `M${x} ${y} q ${c} ${l / 2} ${c / 2} ${l}`, class: 'hair', pathLength: 1, 'stroke-width': 3.5 }, hg);
-      }
-      [[150, 300, 'a'], [500, 360, 'b'], [470, 220, 'c']].forEach(([x, y, k]) =>
-        el('path', { d: `M${x} ${y - 30} L${x + 9} ${y - 9} L${x + 30} ${y} L${x + 9} ${y + 9} L${x} ${y + 30} L${x - 9} ${y + 9} L${x - 30} ${y} L${x - 9} ${y - 9} Z`, class: 'spark ' + k }, svg));
+      waxStrip(svg, 200, 470, 240, 70, 0, '');
+      sparks(svg, [[150, 300, 'a'], [500, 360, 'b'], [470, 220, 'c']]);
+    }
+  }
+  function drawEar(svg, hairy) {
+    el('path', { d: 'M300 100 C 410 80, 500 160, 490 280 C 482 350, 430 380, 418 430 C 408 480, 392 545, 322 552 C 276 556, 256 520, 276 492 C 296 464, 284 444, 256 424 C 210 390, 194 330, 200 255 C 206 165, 240 112, 300 100 Z', fill: '#e6b088', stroke: '#7a4a2c', 'stroke-width': 10, 'stroke-linejoin': 'round' }, svg);
+    el('path', { d: 'M262 190 C 300 140, 400 140, 430 210 C 452 262, 420 300, 392 318', fill: 'none', stroke: '#b97f58', 'stroke-width': 14, 'stroke-linecap': 'round' }, svg);
+    el('path', { d: 'M300 150 C 360 130, 440 160, 452 240', fill: 'none', stroke: 'rgba(255,255,255,.4)', 'stroke-width': 10, 'stroke-linecap': 'round' }, svg);
+    el('ellipse', { cx: 318, cy: 340, rx: 30, ry: 40, fill: '#3a2216' }, svg);
+    if (hairy) {
+      const g = el('g', {}, svg);
+      hairs(g, 318, 340, 34, Math.PI * 1.05, 2.2, 50, 100, 30, 40, 1.1);
+      hairs(g, 300, 300, 10, Math.PI * 1.25, .8, 30, 50, 60, 20, 1.6);
+    } else {
+      waxStrip(svg, 268, 280, 110, 120, 0, 'l');
+      sparks(svg, [[140, 260, 'a'], [200, 520, 'b'], [540, 420, 'c']]);
     }
   }
   document.querySelectorAll('svg.nose').forEach(svg => drawNose(svg, svg.classList.contains('hairy')));
+  document.querySelectorAll('svg.ear').forEach(svg => drawEar(svg, svg.classList.contains('hairy')));
 
   // Barra de progresso
   const bars = slides.map(() => {
