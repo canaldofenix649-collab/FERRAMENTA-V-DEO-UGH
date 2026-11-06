@@ -2,11 +2,11 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import ffmpegStatic from "ffmpeg-static";
 import OpenAI, { toFile } from "openai";
 import sharp from "sharp";
 import type { UgcVideo, ViralVideo } from "./schemas.js";
+import { parseStoredVoice, storedVoiceId, voiceProvider } from "./voice.js";
 
 const run = promisify(execFile);
 const FFMPEG = process.env.FFMPEG_PATH || (ffmpegStatic as unknown as string | null) || "ffmpeg";
@@ -24,20 +24,14 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI() : null;
 const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
 const IMAGE_QUALITY = (process.env.OPENAI_IMAGE_QUALITY || "medium") as "low" | "medium" | "high";
 
-const elevenlabs = process.env.ELEVENLABS_API_KEY
-  ? new ElevenLabsClient(process.env.ELEVENLABS_BASE_URL ? { baseUrl: process.env.ELEVENLABS_BASE_URL } : {})
-  : null;
-const VOICE_VIRAL = process.env.ELEVENLABS_VOICE_ID || "JBFqnCBsd6RMkjVDRZzb";
-const VOICE_UGC = process.env.ELEVENLABS_VOICE_ID_UGC || "21m00Tcm4TlvDq8ikWAM";
-const TTS_MODEL = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
-
 export const videoFeatures = {
   aiImages: Boolean(openai),
-  narration: Boolean(elevenlabs),
-  voiceClone: Boolean(elevenlabs) && process.env.VOICE_CLONE_ENABLED !== "false",
+  narration: Boolean(voiceProvider),
+  voiceClone: Boolean(voiceProvider) && process.env.VOICE_CLONE_ENABLED !== "false",
+  voiceProvider: voiceProvider?.name ?? null,
 };
 
-// ---------- Clonagem de voz (ElevenLabs Instant Voice Cloning) ----------
+// ---------- Clonagem de voz (provedor definido em src/voice.ts) ----------
 export const MIN_VOICE_SECONDS = 20;
 
 /**
@@ -49,7 +43,7 @@ export async function cloneVoice(
   samples: { buffer: Buffer; originalName: string }[],
   workDir: string,
 ): Promise<{ voiceId: string; seconds: number }> {
-  if (!elevenlabs) throw new Error("Clonagem de voz indisponível.");
+  if (!voiceProvider) throw new Error("Clonagem de voz indisponível.");
   await fs.mkdir(workDir, { recursive: true });
   try {
     const files: Buffer[] = [];
@@ -69,21 +63,17 @@ export async function cloneVoice(
     if (seconds < MIN_VOICE_SECONDS) {
       throw new VoiceSampleError(`A gravação tem ${Math.round(seconds)}s. Grave pelo menos ${MIN_VOICE_SECONDS} segundos (o ideal é 1 minuto).`);
     }
-    const created = await elevenlabs.voices.ivc.create({
-      name: `estudio-user-${userId}`,
-      description: "Voz clonada com consentimento do próprio usuário (Estúdio Viral IA).",
-      files: files.map((data, i) => ({ data, filename: `amostra-${i + 1}.mp3`, contentType: "audio/mpeg" })),
-      removeBackgroundNoise: true,
-    });
-    return { voiceId: created.voiceId, seconds: Math.round(seconds) };
+    const voiceId = await voiceProvider.clone(`estudio-user-${userId}`, files);
+    return { voiceId: storedVoiceId(voiceProvider, voiceId), seconds: Math.round(seconds) };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true });
   }
 }
 
-export async function deleteClonedVoice(voiceId: string): Promise<void> {
-  if (!elevenlabs) return;
-  await elevenlabs.voices.delete(voiceId);
+/** Apaga a voz no serviço onde ela foi criada (recebe o ID salvo no banco). */
+export async function deleteClonedVoice(stored: string): Promise<void> {
+  const { provider, voiceId } = parseStoredVoice(stored);
+  if (provider) await provider.deleteVoice(voiceId);
 }
 
 export class VoiceSampleError extends Error {}
@@ -198,21 +188,6 @@ async function composeFrame(background: Buffer, caption: string): Promise<Buffer
 }
 
 // ---------- Áudio ----------
-async function narrate(text: string, voiceId: string, file: string): Promise<void> {
-  const stream = await elevenlabs!.textToSpeech.convert(voiceId, {
-    text,
-    modelId: TTS_MODEL,
-    outputFormat: "mp3_44100_128",
-  });
-  const chunks: Uint8Array[] = [];
-  const reader = stream.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  await fs.writeFile(file, Buffer.concat(chunks));
-}
 
 async function mediaDuration(file: string): Promise<number> {
   // o ffmpeg imprime "Duration: 00:00:04.52" no stderr; o código de saída é 1 porque não há saída
@@ -264,7 +239,11 @@ export async function renderVideo(
 
   const product = kind === "ugc" ? await loadProductImage(generationId) : null;
   const influencerPrompt = "influencer" in result ? result.influencer.avatar_prompt : "";
-  const voice = options.voiceId ?? (kind === "ugc" ? VOICE_UGC : VOICE_VIRAL);
+  // voz clonada do usuário (usa o serviço onde ela foi criada) ou a voz padrão do provedor ativo
+  const cloned = options.voiceId ? parseStoredVoice(options.voiceId) : null;
+  if (cloned && !cloned.provider) throw new Error(`Provedor da voz clonada (${cloned.providerName}) sem chave configurada.`);
+  const tts = cloned?.provider ?? voiceProvider;
+  const voice = cloned?.voiceId ?? (tts ? tts.defaultVoices[kind === "ugc" ? "ugc" : "viral"] : "");
   const scenes = result.scenes;
   const files: string[] = [];
   const segments: string[] = [];
@@ -299,9 +278,9 @@ export async function renderVideo(
     // 3. Narração da cena
     let audio: string | null = null;
     let seconds = Math.max(2, scene.end_seconds - scene.start_seconds);
-    if (elevenlabs && scene.narration.trim()) {
+    if (tts && scene.narration.trim()) {
       audio = path.join(dir, `audio-${n}.mp3`);
-      await narrate(scene.narration, voice, audio);
+      await tts.narrate(scene.narration, voice, audio);
       seconds = (await mediaDuration(audio)) + 0.3;
     }
 

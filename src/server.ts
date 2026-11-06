@@ -17,6 +17,7 @@ import {
   verifyPassword,
 } from "./auth.js";
 import * as db from "./db.js";
+import { parseStoredVoice } from "./voice.js";
 import os from "node:os";
 import {
   cloneVoice,
@@ -269,7 +270,7 @@ async function processRender(generationId: number, userId: number): Promise<void
     db.upsertVideo(generationId, { status: "processing", progress: "Começando..." });
     let voiceId: string | undefined;
     if (db.getVideoVoice(generationId) === "mine") {
-      voiceId = db.getUserVoice(userId)?.voiceId;
+      voiceId = usableVoice(userId)?.voiceId;
       if (!voiceId) throw new Error("O usuário não tem mais voz clonada.");
     }
     const rendered = await renderVideo(
@@ -319,7 +320,7 @@ app.post("/api/generations/:id/video", requireUser, (req, res) => {
     return;
   }
   const voice = req.body?.voice === "mine" ? "mine" : "ai";
-  if (voice === "mine" && !db.getUserVoice(user.id)) {
+  if (voice === "mine" && !usableVoice(user.id)) {
     db.addCredits(user.id, config.costVideo, "Estorno: voz clonada não encontrada");
     res.status(400).json({ error: "Você ainda não clonou sua voz." });
     return;
@@ -353,6 +354,12 @@ app.get("/api/generations/:id/media/:file", requireUser, (req, res) => {
 });
 
 // ---------- Minha voz (clonagem com consentimento) ----------
+/** Voz clonada do usuário, se o serviço onde ela foi criada ainda estiver configurado. */
+function usableVoice(userId: number) {
+  const voice = db.getUserVoice(userId);
+  return voice && parseStoredVoice(voice.voiceId).provider ? voice : null;
+}
+
 const CONSENT_TEXT =
   "Eu confirmo que esta é a minha própria voz e autorizo o Estúdio Viral IA a criar uma cópia digital dela " +
   "para narrar os vídeos que eu gerar nesta conta.";
@@ -360,7 +367,7 @@ const voiceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 const voiceLimiter = rateLimiter(5, 60 * 60 * 1000); // até 5 tentativas de clonagem por hora
 
 app.get("/api/voice", requireUser, (req, res) => {
-  const voice = db.getUserVoice(req.user!.id);
+  const voice = usableVoice(req.user!.id);
   res.json({
     available: videoFeatures.voiceClone,
     voice: voice ? { createdAt: voice.createdAt } : null,

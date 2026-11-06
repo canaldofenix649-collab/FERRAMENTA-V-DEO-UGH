@@ -326,7 +326,7 @@ function showVideo(video) {
   $("#video-voice-wrap").classList.toggle("hidden", !myVoice);
 
   const hint = $("#video-admin-hint");
-  const missing = [!features.aiImages && "OPENAI_API_KEY (imagens com IA)", !features.narration && "ELEVENLABS_API_KEY (narração)"].filter(Boolean);
+  const missing = [!features.aiImages && "OPENAI_API_KEY (imagens com IA)", !features.narration && "AI33_API_KEY ou ELEVENLABS_API_KEY (narração)"].filter(Boolean);
   hint.classList.toggle("hidden", !(me && me.isAdmin && missing.length));
   hint.textContent = missing.length ? `Admin: configure ${missing.join(" e ")} no servidor para vídeos completos.` : "";
 

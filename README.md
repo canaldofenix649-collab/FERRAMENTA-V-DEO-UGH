@@ -60,6 +60,7 @@ docker run -p 3000:3000 -v estudio-data:/data --env-file .env estudio-viral
 | `src/schemas.ts` | Formato dos resultados (cenas, ganchos, produto, influenciadora...) |
 | `src/db.ts` | Banco SQLite: usuários, sessões, créditos e histórico |
 | `src/auth.ts` | Senhas, sessões e limites de tentativas |
+| `src/voice.ts` | Serviços de voz (ai33 e ElevenLabs): narração, clonagem e exclusão de vozes |
 | `src/video.ts` | Geração do MP4: imagens das cenas, legendas, narração e montagem com FFmpeg |
 | `public/` | Interface web (login, ferramenta, histórico, player de prévia e painel admin) |
 
@@ -68,7 +69,7 @@ docker run -p 3000:3000 -v estudio-data:/data --env-file .env estudio-viral
 | Etapa | Serviço | Sem a chave |
 |---|---|---|
 | Imagem de cada cena | OpenAI (`OPENAI_API_KEY`). No UGC, a foto do produto é enviada como referência para a influenciadora aparecer segurando o produto real | Fundo colorido (Shorts) ou a foto do produto (UGC) |
-| Narração | ElevenLabs (`ELEVENLABS_API_KEY`), uma voz para Shorts e outra para UGC | Vídeo sem narração |
+| Narração | ai33.pro (`AI33_API_KEY`) ou ElevenLabs (`ELEVENLABS_API_KEY`), escolhido em `VOICE_PROVIDER`; uma voz para Shorts e outra para UGC | Vídeo sem narração |
 | Legendas e montagem | FFmpeg e sharp, rodando no próprio servidor (grátis) | Sempre funciona |
 
 Cada cena dura exatamente o tempo da narração, então as legendas ficam sincronizadas. A imagem recebe um zoom lento (efeito Ken Burns), como nos Shorts.
@@ -88,7 +89,9 @@ Cuidados que já estão no código:
 - o usuário pode **excluir a voz** a qualquer momento, e ela é apagada também na ElevenLabs;
 - há limite de 5 tentativas de clonagem por hora.
 
-A clonagem de voz exige um plano pago na ElevenLabs, e cada plano tem um limite de vozes personalizadas. Confira o seu antes de liberar para muitos clientes. Para desativar, use `VOICE_CLONE_ENABLED=false`. Para cobrar, use `COST_VOICE_CLONE`.
+A clonagem funciona com os dois serviços de voz (`VOICE_PROVIDER=ai33` ou `elevenlabs`). Cada voz fica salva junto com o nome do serviço onde foi criada. Se você trocar de serviço, as vozes antigas continuam funcionando enquanto a chave do serviço antigo estiver no `.env`; sem ela, o cliente só precisa gravar de novo.
+
+Na ElevenLabs, a clonagem exige um plano pago, e cada plano tem um limite de vozes personalizadas. Confira o seu antes de liberar para muitos clientes. Para desativar, use `VOICE_CLONE_ENABLED=false`. Para cobrar, use `COST_VOICE_CLONE`.
 
 Deixe claro nos seus termos de uso que é proibido clonar a voz de outra pessoa sem autorização.
 
