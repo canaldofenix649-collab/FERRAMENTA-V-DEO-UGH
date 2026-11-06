@@ -1,0 +1,251 @@
+<title>Negueba Show Impacto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Archivo:wght@600&family=DM+Mono:wght@500&family=Kaushan+Script&display=swap">
+<style>
+/* Layout: palco 1920x1080 escalado; uma palavra por vez em tela cheia, cortes secos alternando vermelho e branco, com zoom e tremida. Visual único vermelho/branco, de propósito, para TV. */
+:root {
+  --red: #b8101c;
+  --red-dark: #7a0911;
+  --white: #ffffff;
+  --off: #f3eeee;
+  --display: "Big Shoulders Display", "Impact", "Arial Narrow", sans-serif;
+  --script: "Kaushan Script", "Brush Script MT", cursive;
+  --mono: "DM Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--red-dark); overflow: hidden; font-family: "Archivo", Arial, sans-serif; color: var(--white);
+  padding-left: max(0px, env(safe-area-inset-left, 0px)); padding-right: max(0px, env(safe-area-inset-right, 0px)); }
+#viewport { position: fixed; inset: 0; background: var(--red-dark); overflow: hidden; }
+#stage { width: 1920px; height: 1080px; position: absolute; left: 50%; top: 50%; overflow: hidden; transform-origin: center; }
+#shaker { position: absolute; inset: 0; }
+#shaker.shake { animation: shake .35s linear; }
+@keyframes shake {
+  0% { transform: translate(0,0) rotate(0); } 15% { transform: translate(-22px,12px) rotate(-1.2deg); }
+  30% { transform: translate(18px,-14px) rotate(1deg); } 45% { transform: translate(-14px,-8px) rotate(-.6deg); }
+  60% { transform: translate(10px,10px) rotate(.5deg); } 80% { transform: translate(-5px,3px); } 100% { transform: none; }
+}
+
+/* Quadro */
+.frame { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.frame.red { background: var(--red); color: var(--white); }
+.frame.white { background: var(--white); color: var(--red); }
+.frame.red::before {
+  content: ""; position: absolute; inset: -50%;
+  background: repeating-linear-gradient(-35deg, rgba(255,255,255,.05) 0 60px, transparent 60px 120px);
+  animation: slide 1.2s linear infinite;
+}
+.frame.white::before {
+  content: ""; position: absolute; inset: -50%;
+  background: repeating-linear-gradient(-35deg, rgba(184,16,28,.05) 0 60px, transparent 60px 120px);
+  animation: slide 1.2s linear infinite;
+}
+@keyframes slide { to { transform: translateX(170px); } }
+.frame > * { position: relative; }
+
+.word { font-family: var(--display); font-weight: 900; text-transform: uppercase; line-height: .95; white-space: nowrap; letter-spacing: -.01em; }
+.sub { font-family: var(--mono); font-size: 44px; letter-spacing: .3em; text-transform: uppercase; margin-top: 28px; opacity: .9; }
+.box { background: currentColor; padding: .04em .16em 0; }
+.box > span { color: var(--red); }
+.frame.white .box > span { color: var(--white); }
+
+/* Entradas */
+.punch { animation: punch .32s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes punch { from { transform: scale(2.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.slam { animation: slam .28s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes slam { from { transform: scale(.2) rotate(-8deg); } to { transform: none; } }
+.zoomdrift { animation: drift 2s ease-out both; }
+@keyframes drift { from { transform: scale(1.0); } to { transform: scale(1.12); } }
+.fromleft { animation: fromleft .3s cubic-bezier(.2,1.2,.4,1) both; }
+@keyframes fromleft { from { transform: translateX(-1400px) skewX(20deg); } to { transform: none; } }
+.fromright { animation: fromright .3s cubic-bezier(.2,1.2,.4,1) both; }
+@keyframes fromright { from { transform: translateX(1400px) skewX(-20deg); } to { transform: none; } }
+
+/* Flash de corte */
+#flash { position: absolute; inset: 0; background: var(--white); opacity: 0; pointer-events: none; z-index: 9; }
+#flash.go { animation: flash .18s ease-out; }
+@keyframes flash { from { opacity: .9; } to { opacity: 0; } }
+
+/* Desenhos */
+.pic { width: 780px; height: 780px; position: relative; }
+.disc { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 45% 35%, #ffffff, #f1eceb 70%); box-shadow: 0 0 0 18px rgba(255,255,255,.22), 0 30px 80px rgba(0,0,0,.35); }
+.frame.white .disc { box-shadow: 0 0 0 18px rgba(184,16,28,.9); }
+.pic svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.side { display: flex; align-items: center; gap: 80px; }
+.side .word { text-align: left; }
+
+.hair { fill: none; stroke: #2a1a10; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.on .hair { animation: grow .5s ease-out forwards; }
+@keyframes grow { to { stroke-dashoffset: 0; } }
+.strip { transform-box: fill-box; transform-origin: center; }
+.on .strip { animation: yank 1.3s cubic-bezier(.6,0,.2,1) .35s forwards; }
+@keyframes yank { 0%, 30% { transform: none; } 55% { transform: translate(140px,-230px) rotate(-28deg); } 100% { transform: translate(150px,-240px) rotate(-24deg); } }
+.on .strip.l { animation-name: yankL; }
+@keyframes yankL { 0%, 30% { transform: none; } 55% { transform: translate(-170px,-200px) rotate(26deg); } 100% { transform: translate(-180px,-210px) rotate(22deg); } }
+.strip .hair { stroke-dashoffset: 0; animation: none !important; }
+.spark { fill: #c8101c; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.on .spark { animation: spark .8s ease-out 1s infinite; }
+@keyframes spark { 0% { opacity: 0; transform: scale(.2); } 40% { opacity: 1; transform: scale(1) rotate(45deg); } 100% { opacity: 0; transform: scale(.4) rotate(90deg); } }
+
+/* Logo */
+.logo { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
+.logo small { font-family: var(--mono); font-size: .26em; letter-spacing: .45em; margin-right: -.45em; text-transform: uppercase; margin-bottom: .3em; }
+.logo b { font-family: var(--script); font-weight: 400; transform: rotate(-4deg); }
+.logo.xl { font-size: 260px; }
+.frame.red .logo.xl b { text-shadow: 0 .05em 0 rgba(60,0,6,.45); }
+.pill { margin-top: 56px; background: var(--white); color: var(--red); font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: 96px; line-height: 1; padding: 30px 70px 24px; border-radius: 999px; animation: pulse 1s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,.6); } 100% { box-shadow: 0 0 0 46px rgba(255,255,255,0); } }
+
+/* Marca fixa no canto */
+#corner { position: absolute; z-index: 8; left: 72px; bottom: 50px; font-size: 52px; transition: color .1s; }
+#corner.hide { opacity: 0; }
+
+#fs { position: fixed; z-index: 20; top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  font: 600 14px "Archivo", Arial, sans-serif; color: var(--white); background: rgba(122,9,17,.9);
+  border: 1px solid rgba(255,255,255,.6); border-radius: 999px; padding: 10px 18px; cursor: pointer; transition: opacity .4s; }
+#fs:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+body.idle #fs { opacity: 0; pointer-events: none; }
+body.idle { cursor: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .punch, .slam, .fromleft, .fromright, .zoomdrift, #shaker.shake, .frame::before { animation: none !important; }
+}
+</style>
+
+<div id="viewport">
+  <div id="stage">
+    <div id="shaker"></div>
+    <div id="flash"></div>
+    <div id="corner" class="logo"><small>Barbearia</small><b>Negueba Show</b></div>
+  </div>
+</div>
+<button id="fs" type="button">Tela cheia</button>
+
+<script>
+(function () {
+  const stage = document.getElementById('stage');
+  const shaker = document.getElementById('shaker');
+  const flash = document.getElementById('flash');
+  const corner = document.getElementById('corner');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function fit() { const s = Math.min(innerWidth / 1920, innerHeight / 1080); stage.style.transform = 'translate(-50%, -50%) scale(' + s + ')'; }
+  addEventListener('resize', fit); fit();
+
+  // Desenha nariz e ouvido, com ou sem pelos
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+  let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  // pelos saindo de (cx,cy) na direção base 'ang' com abertura 'spread'
+  function hairs(g, cx, cy, n, ang0, spread, lmin, lvar, jx, jy, delay0) {
+    for (let i = 0; i < n; i++) {
+      const sx = cx + (rnd() - .5) * jx, sy = cy + (rnd() - .5) * jy;
+      const ang = ang0 + (rnd() - .5) * spread;
+      const len = lmin + rnd() * lvar, curl = (rnd() - .5) * 60;
+      const ex = sx + Math.cos(ang) * len, ey = sy + Math.sin(ang) * len;
+      const mx = (sx + ex) / 2 - Math.sin(ang) * curl, my = (sy + ey) / 2 + Math.cos(ang) * curl;
+      const h = el('path', { d: `M${sx} ${sy} Q${mx} ${my} ${ex} ${ey}`, class: 'hair', pathLength: 1, 'stroke-width': (3 + rnd() * 3).toFixed(1) }, g);
+      h.style.animationDelay = (delay0 + rnd() * 1.4).toFixed(2) + 's';
+    }
+  }
+  function waxStrip(svg, x, y, w, h, rot, extra) {
+    const strip = el('g', { class: 'strip ' + (extra || '') }, svg);
+    el('rect', { x, y, width: w, height: h, rx: 24, fill: '#ffffff', stroke: '#c8101c', 'stroke-width': 6, transform: `rotate(${rot} ${x + w / 2} ${y + h / 2})` }, strip);
+    const hg = el('g', { transform: `rotate(${rot} ${x + w / 2} ${y + h / 2})` }, strip);
+    for (let i = 0; i < Math.round(w / 8); i++) {
+      const hx = x + 14 + rnd() * (w - 28), hy = y + 16 + rnd() * (h - 32), l = 14 + rnd() * 24, c = (rnd() - .5) * 16;
+      el('path', { d: `M${hx} ${hy} q ${c} ${l / 2} ${c / 2} ${l}`, class: 'hair', pathLength: 1, 'stroke-width': 3.5 }, hg);
+    }
+  }
+  function sparks(svg, pts) {
+    pts.forEach(([x, y, k]) =>
+      el('path', { d: `M${x} ${y - 30} L${x + 9} ${y - 9} L${x + 30} ${y} L${x + 9} ${y + 9} L${x} ${y + 30} L${x - 9} ${y + 9} L${x - 30} ${y} L${x - 9} ${y - 9} Z`, class: 'spark ' + k }, svg));
+  }
+  function drawNose(svg, hairy) {
+    el('path', { d: 'M282 70 C 278 190, 262 290, 222 370 C 182 420, 168 478, 208 512 C 236 534, 268 522, 290 512 C 306 530, 334 530, 350 512 C 372 522, 404 534, 432 512 C 472 478, 458 420, 418 370 C 378 290, 362 190, 358 70', fill: '#e6b088', stroke: '#7a4a2c', 'stroke-width': 10, 'stroke-linejoin': 'round' }, svg);
+    el('path', { d: 'M300 120 C 300 220, 296 320, 300 400', fill: 'none', stroke: 'rgba(255,255,255,.45)', 'stroke-width': 14, 'stroke-linecap': 'round' }, svg);
+    el('ellipse', { cx: 262, cy: 486, rx: 34, ry: 17, transform: 'rotate(-18 262 486)', fill: '#3a2216' }, svg);
+    el('ellipse', { cx: 378, cy: 486, rx: 34, ry: 17, transform: 'rotate(18 378 486)', fill: '#3a2216' }, svg);
+    if (hairy) {
+      const g = el('g', {}, svg);
+      hairs(g, 262, 490, 26, Math.PI / 2 + .35, 1.1, 60, 110, 50, 12, 1.1);
+      hairs(g, 378, 490, 26, Math.PI / 2 - .35, 1.1, 60, 110, 50, 12, 1.1);
+    } else {
+      waxStrip(svg, 200, 470, 240, 70, 0, '');
+      sparks(svg, [[150, 300, 'a'], [500, 360, 'b'], [470, 220, 'c']]);
+    }
+  }
+  function drawEar(svg, hairy) {
+    el('path', { d: 'M300 100 C 410 80, 500 160, 490 280 C 482 350, 430 380, 418 430 C 408 480, 392 545, 322 552 C 276 556, 256 520, 276 492 C 296 464, 284 444, 256 424 C 210 390, 194 330, 200 255 C 206 165, 240 112, 300 100 Z', fill: '#e6b088', stroke: '#7a4a2c', 'stroke-width': 10, 'stroke-linejoin': 'round' }, svg);
+    el('path', { d: 'M262 190 C 300 140, 400 140, 430 210 C 452 262, 420 300, 392 318', fill: 'none', stroke: '#b97f58', 'stroke-width': 14, 'stroke-linecap': 'round' }, svg);
+    el('path', { d: 'M300 150 C 360 130, 440 160, 452 240', fill: 'none', stroke: 'rgba(255,255,255,.4)', 'stroke-width': 10, 'stroke-linecap': 'round' }, svg);
+    el('ellipse', { cx: 318, cy: 340, rx: 30, ry: 40, fill: '#3a2216' }, svg);
+    if (hairy) {
+      const g = el('g', {}, svg);
+      hairs(g, 318, 340, 34, Math.PI * 1.05, 2.2, 50, 100, 30, 40, 1.1);
+      hairs(g, 300, 300, 10, Math.PI * 1.25, .8, 30, 50, 60, 20, 1.6);
+    } else {
+      waxStrip(svg, 268, 280, 110, 120, 0, 'l');
+      sparks(svg, [[140, 260, 'a'], [200, 520, 'b'], [540, 420, 'c']]);
+    }
+  }
+
+
+  // Roteiro: cada batida é um corte seco
+  // t = duração (ms), bg = cor do fundo, fx = tremida/flash
+  const W = (txt, size, anim) => `<div class="word ${anim || 'punch'}" style="font-size:${size}px">${txt}</div>`;
+  const BEATS = [
+    { t: 650, bg: 'white', html: W('Pelo', 520) },
+    { t: 420, bg: 'red', html: W('no', 600, 'slam') },
+    { t: 800, bg: 'white', html: W('<span class="box"><span>nariz?</span></span>', 400), fx: 'shake' },
+    { t: 1700, bg: 'red', pic: 'nose-hairy', html: '<div class="side"><div class="pic slam"><div class="disc"></div><svg viewBox="0 0 640 640"></svg></div>' + W('Eca!', 300, 'fromright') + '</div>' },
+    { t: 500, bg: 'white', html: W('E no', 480, 'fromleft') },
+    { t: 800, bg: 'red', html: W('<span class="box"><span>ouvido?</span></span>', 360), fx: 'shake' },
+    { t: 1700, bg: 'white', pic: 'ear-hairy', html: '<div class="side"><div class="pic slam"><div class="disc"></div><svg viewBox="0 0 640 640"></svg></div>' + W('Xô,<br>pelo!', 260, 'fromright') + '</div>' },
+    { t: 650, bg: 'red', html: W('Chega!', 460), fx: 'shake' },
+    { t: 550, bg: 'white', html: W('Cera', 560, 'slam') + '<div class="sub">quente</div>' },
+    { t: 450, bg: 'red', html: W('Puxou...', 380, 'fromleft') },
+    { t: 1800, bg: 'white', pic: 'both-clean', html: '<div class="side" style="gap:40px"><div class="pic" style="width:600px;height:600px"><div class="disc"></div><svg viewBox="0 0 640 640" data-k="nose"></svg></div><div class="pic" style="width:600px;height:600px"><div class="disc"></div><svg viewBox="0 0 640 640" data-k="ear"></svg></div></div>' + W('Saiu!', 200, 'slam'), fx: 'shake' },
+    { t: 700, bg: 'red', html: W('10', 900, 'slam'), fx: 'flash' },
+    { t: 800, bg: 'white', html: W('minutos', 400, 'fromright') + '<div class="sub">e pronto</div>' },
+    { t: 900, bg: 'red', html: W('Nariz', 300, 'fromleft') + W('+ ouvido', 300, 'fromright') },
+    { t: 900, bg: 'white', html: W('<span class="box"><span>limpos</span></span>', 420), fx: 'shake' },
+    { t: 1900, bg: 'red', nocorner: true, html: '<div class="logo xl slam"><small>Barbearia</small><b>Negueba Show</b></div>', fx: 'flash' },
+    { t: 2600, bg: 'red', nocorner: true, html: W('Peça ao<br>seu barbeiro', 220, 'punch') + '<div class="pill">Nariz + ouvido na cera</div>' }
+  ];
+
+  let i = -1, timer;
+  function next() {
+    i = (i + 1) % BEATS.length;
+    const b = BEATS[i];
+    const f = document.createElement('div');
+    f.className = 'frame on ' + b.bg;
+    f.innerHTML = b.html;
+    shaker.replaceChildren(f);
+    if (b.pic === 'nose-hairy') drawNose(f.querySelector('svg'), true);
+    if (b.pic === 'ear-hairy') drawEar(f.querySelector('svg'), true);
+    if (b.pic === 'both-clean') { drawNose(f.querySelector('[data-k=nose]'), false); drawEar(f.querySelector('[data-k=ear]'), false); }
+    // pelos crescem rápido nesta versão
+    f.querySelectorAll('.hair').forEach(h => { if (h.style.animationDelay) h.style.animationDelay = (parseFloat(h.style.animationDelay) * .35).toFixed(2) + 's'; });
+    corner.style.color = b.bg === 'white' ? 'var(--red)' : 'var(--white)';
+    corner.classList.toggle('hide', !!b.nocorner);
+    if (!reduce && b.fx === 'shake') { shaker.classList.remove('shake'); void shaker.offsetWidth; shaker.classList.add('shake'); }
+    if (!reduce && b.fx === 'flash') { flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go'); }
+    clearTimeout(timer); timer = setTimeout(next, b.t);
+  }
+  next();
+
+  document.getElementById('fs').addEventListener('click', () => {
+    const p = document.fullscreenElement ? document.exitFullscreen() : (document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : null);
+    if (p && p.catch) p.catch(() => {});
+  });
+  async function wake() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {} }
+  wake(); document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+  let t;
+  function poke() { document.body.classList.remove('idle'); clearTimeout(t); t = setTimeout(() => document.body.classList.add('idle'), 3000); }
+  addEventListener('mousemove', poke); addEventListener('keydown', poke); poke();
+  addEventListener('keydown', e => { if (e.key === 'ArrowRight') next(); });
+})();
+</script>
