@@ -11,6 +11,10 @@ Também tem **contas de usuário com créditos**, **histórico dos vídeos gerad
 
 ## Como rodar
 
+**No Windows, o jeito mais fácil:** instale o Node.js (versão LTS em nodejs.org), baixe o projeto e dê dois cliques em `iniciar.bat`. Na primeira vez ele abre o `.env` para você colar as chaves, instala tudo e abre o site no navegador.
+
+**Pelo terminal (qualquer sistema):**
+
 Você precisa do **Node.js 22.13 ou mais recente** e de uma chave da API da Anthropic (https://console.anthropic.com).
 
 ```bash
