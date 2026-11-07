@@ -142,7 +142,7 @@ body.idle { cursor: none; }
     { nome: 'Pezinho', preco: 7, desc: 'Aquele acabamento entre um corte e outro.' },
     { nome: 'Pigmentação', preco: 20, desc: 'Mais preenchimento e definição no corte e na barba.' }
   ];
-  const NOVIDADE = { nome: 'Depilação na cera', detalhe: 'Nariz + ouvido', preco: 20 };
+  const NOVIDADE = { nome: 'Cera no nariz e ouvido', detalhe: 'Limpeza rápida · 10 min', preco: 20 };
 
   const stage = document.getElementById('stage');
   const shaker = document.getElementById('shaker');
@@ -170,15 +170,15 @@ body.idle { cursor: none; }
   });
   BEATS.push({ t: 1000, bg: 'white', fx: 'flash', html: `<div class="big slam" style="font-size:340px">Atenção!</div>` });
   BEATS.push({ t: 1800, bg: 'red', fx: 'shake', html: `<div class="badge blink" style="font-size:200px;padding:30px 80px 14px">Novidade</div>` });
-  BEATS.push({ t: 1800, bg: 'ink', html: `<div class="kicker fromleft">Agora na Negueba Show</div><div class="big punch d1" style="font-size:230px">${NOVIDADE.nome}</div>` });
-  BEATS.push({ t: 1700, bg: 'white', fx: 'shake', html: `<div class="big slam" style="font-size:280px">${NOVIDADE.detalhe}</div>` });
+  BEATS.push({ t: 1800, bg: 'ink', html: `<div class="kicker fromleft">Agora na Negueba Show</div><div class="big punch d1" style="font-size:300px">Cera no</div>` });
+  BEATS.push({ t: 1700, bg: 'white', fx: 'shake', html: `<div class="big slam" style="font-size:280px">Nariz + ouvido</div>` });
   BEATS.push({ t: 6000, bg: 'red', fx: 'flash', html:
-    `<div class="nov-side"><div class="txt"><div class="badge fromleft">Novidade</div><div class="big fromleft d1" style="margin-top:34px">Depilação<br>na cera</div><div class="kicker fromleft d2" style="margin-top:18px">${NOVIDADE.detalhe}</div></div>
+    `<div class="nov-side"><div class="txt"><div class="badge fromleft">Novidade</div><div class="big fromleft d1" style="margin-top:34px">Cera no<br>nariz e<br>ouvido</div><div class="kicker fromleft d2" style="margin-top:18px">${NOVIDADE.detalhe}</div></div>
      <div class="burst slam d1"><div style="position:absolute;inset:0">${burst}</div><div class="inner pulse">${price(NOVIDADE.preco, 320)}<span class="lbl">os dois</span></div></div></div>` });
   BEATS.push({ t: 9000, bg: 'white', nocorner: true, html:
     `<div class="table"><div class="logo-box"><img class="slam" alt="Barbearia Negueba Show" src="${LOGO_COR}"><div class="kicker">Tabela de serviços</div></div>
      <ul class="rows">${SERVICOS.map((s, k) => `<li style="animation-delay:${(k * .08).toFixed(2)}s"><span>${s.nome}</span><span class="dots"></span><span class="p"><small>R$</small>${s.preco}</span></li>`).join('')}
-     <li class="new" style="animation-delay:${(SERVICOS.length * .08 + .2).toFixed(2)}s"><span class="tagnew">Novidade</span><span>Nariz + ouvido</span><span class="dots"></span><span class="p"><small>R$</small>${NOVIDADE.preco}</span></li></ul></div>` });
+     <li class="new" style="animation-delay:${(SERVICOS.length * .08 + .2).toFixed(2)}s"><span class="tagnew">Novidade</span><span>Cera no nariz e ouvido</span><span class="dots"></span><span class="p"><small>R$</small>${NOVIDADE.preco}</span></li></ul></div>` });
 
   let i = -1, timer, lateShake;
   function doShake() { if (reduce) return; shaker.classList.remove('shake'); void shaker.offsetWidth; shaker.classList.add('shake'); }
