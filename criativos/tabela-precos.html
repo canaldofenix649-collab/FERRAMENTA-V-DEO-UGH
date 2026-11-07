@@ -158,24 +158,24 @@ body.idle { cursor: none; }
 
   // Roteiro de cortes
   const BEATS = [];
-  BEATS.push({ t: 1500, bg: 'white', nocorner: true, fx: 'flash', html: `<img class="biglogo slam" alt="Barbearia Negueba Show" src="${LOGO_COR}">` });
-  BEATS.push({ t: 600, bg: 'red', html: `<div class="big punch" style="font-size:300px">Tabela</div>` });
-  BEATS.push({ t: 700, bg: 'ink', fx: 'shake', html: `<div class="big slam" style="font-size:300px">de preços</div>` });
+  BEATS.push({ t: 2500, bg: 'white', nocorner: true, fx: 'flash', html: `<img class="biglogo slam" alt="Barbearia Negueba Show" src="${LOGO_COR}">` });
+  BEATS.push({ t: 1100, bg: 'red', html: `<div class="big punch" style="font-size:300px">Tabela</div>` });
+  BEATS.push({ t: 1300, bg: 'ink', fx: 'shake', html: `<div class="big slam" style="font-size:300px">de preços</div>` });
   SERVICOS.forEach((s, k) => {
     const bg = k % 2 ? 'white' : 'red';
     const anim = k % 2 ? 'fromright' : 'fromleft';
-    BEATS.push({ t: 2300, bg, fx: 'shake-late', html:
+    BEATS.push({ t: 3300, bg, fx: 'shake-late', html:
       `<div class="svc"><div><div class="num ${anim}">${String(k + 1).padStart(2, '0')} / ${String(SERVICOS.length).padStart(2, '0')}</div><div class="big ${anim}" style="font-size:${s.nome.length > 11 ? 170 : 210}px">${s.nome}</div><p class="desc ${anim} d2">${s.desc}</p></div>
        <div class="chip stamp">${price(s.preco, 300)}</div></div>` });
   });
-  BEATS.push({ t: 450, bg: 'white', fx: 'flash', html: `<div class="big slam" style="font-size:340px">Atenção!</div>` });
-  BEATS.push({ t: 1000, bg: 'red', fx: 'shake', html: `<div class="badge blink" style="font-size:200px;padding:30px 80px 14px">Novidade</div>` });
-  BEATS.push({ t: 900, bg: 'ink', html: `<div class="kicker fromleft">Agora na Negueba Show</div><div class="big punch d1" style="font-size:230px">${NOVIDADE.nome}</div>` });
-  BEATS.push({ t: 900, bg: 'white', fx: 'shake', html: `<div class="big slam" style="font-size:280px">${NOVIDADE.detalhe}</div>` });
-  BEATS.push({ t: 3200, bg: 'red', fx: 'flash', html:
+  BEATS.push({ t: 1000, bg: 'white', fx: 'flash', html: `<div class="big slam" style="font-size:340px">Atenção!</div>` });
+  BEATS.push({ t: 1800, bg: 'red', fx: 'shake', html: `<div class="badge blink" style="font-size:200px;padding:30px 80px 14px">Novidade</div>` });
+  BEATS.push({ t: 1800, bg: 'ink', html: `<div class="kicker fromleft">Agora na Negueba Show</div><div class="big punch d1" style="font-size:230px">${NOVIDADE.nome}</div>` });
+  BEATS.push({ t: 1700, bg: 'white', fx: 'shake', html: `<div class="big slam" style="font-size:280px">${NOVIDADE.detalhe}</div>` });
+  BEATS.push({ t: 6000, bg: 'red', fx: 'flash', html:
     `<div class="nov-side"><div class="txt"><div class="badge fromleft">Novidade</div><div class="big fromleft d1" style="margin-top:34px">Depilação<br>na cera</div><div class="kicker fromleft d2" style="margin-top:18px">${NOVIDADE.detalhe}</div></div>
      <div class="burst slam d1"><div style="position:absolute;inset:0">${burst}</div><div class="inner pulse">${price(NOVIDADE.preco, 320)}<span class="lbl">os dois</span></div></div></div>` });
-  BEATS.push({ t: 6500, bg: 'white', nocorner: true, html:
+  BEATS.push({ t: 9000, bg: 'white', nocorner: true, html:
     `<div class="table"><div class="logo-box"><img class="slam" alt="Barbearia Negueba Show" src="${LOGO_COR}"><div class="kicker">Tabela de serviços</div></div>
      <ul class="rows">${SERVICOS.map((s, k) => `<li style="animation-delay:${(k * .08).toFixed(2)}s"><span>${s.nome}</span><span class="dots"></span><span class="p"><small>R$</small>${s.preco}</span></li>`).join('')}
      <li class="new" style="animation-delay:${(SERVICOS.length * .08 + .2).toFixed(2)}s"><span class="tagnew">Novidade</span><span>Nariz + ouvido</span><span class="dots"></span><span class="p"><small>R$</small>${NOVIDADE.preco}</span></li></ul></div>` });
