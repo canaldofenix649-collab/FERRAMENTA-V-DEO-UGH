@@ -55,6 +55,7 @@ body { margin: 0; background: var(--red-dark); overflow: hidden; font-family: va
 .svc .num { font-family: var(--display); font-weight: 600; font-size: 40px; letter-spacing: .25em; opacity: .8; }
 .svc .big { font-size: 210px; }
 .svc .chip { margin: 0; transform: rotate(-3deg); }
+.svc .desc { font-family: var(--body); font-weight: 500; font-size: 46px; line-height: 1.25; margin: 22px 0 0; max-width: 24ch; white-space: normal; opacity: .92; }
 
 /* Entradas */
 .punch { animation: punch .3s cubic-bezier(.2,1.5,.4,1) both; }
@@ -134,12 +135,12 @@ body.idle { cursor: none; }
 
   // Serviços e preços (edite aqui)
   const SERVICOS = [
-    { nome: 'Corte', preco: 25 },
-    { nome: 'Barba', preco: 20 },
-    { nome: 'Limpeza de pele', preco: 10 },
-    { nome: 'Sobrancelha', preco: 5 },
-    { nome: 'Pezinho', preco: 7 },
-    { nome: 'Pigmentação', preco: 20 }
+    { nome: 'Corte', preco: 25, desc: 'O corte do seu jeito, com acabamento caprichado.' },
+    { nome: 'Barba', preco: 20, desc: 'Barba desenhada, alinhada e bem cuidada.' },
+    { nome: 'Limpeza de pele', preco: 10, desc: 'Pele limpa e renovada pra fechar o visual.' },
+    { nome: 'Sobrancelha', preco: 5, desc: 'Sobrancelha alinhada, sem exagero.' },
+    { nome: 'Pezinho', preco: 7, desc: 'Aquele acabamento entre um corte e outro.' },
+    { nome: 'Pigmentação', preco: 20, desc: 'Mais preenchimento e definição no corte e na barba.' }
   ];
   const NOVIDADE = { nome: 'Depilação na cera', detalhe: 'Nariz + ouvido', preco: 20 };
 
@@ -163,8 +164,8 @@ body.idle { cursor: none; }
   SERVICOS.forEach((s, k) => {
     const bg = k % 2 ? 'white' : 'red';
     const anim = k % 2 ? 'fromright' : 'fromleft';
-    BEATS.push({ t: 1500, bg, fx: 'shake-late', html:
-      `<div class="svc"><div><div class="num ${anim}">${String(k + 1).padStart(2, '0')} / ${String(SERVICOS.length).padStart(2, '0')}</div><div class="big ${anim}" style="font-size:${s.nome.length > 11 ? 170 : 210}px">${s.nome}</div></div>
+    BEATS.push({ t: 2300, bg, fx: 'shake-late', html:
+      `<div class="svc"><div><div class="num ${anim}">${String(k + 1).padStart(2, '0')} / ${String(SERVICOS.length).padStart(2, '0')}</div><div class="big ${anim}" style="font-size:${s.nome.length > 11 ? 170 : 210}px">${s.nome}</div><p class="desc ${anim} d2">${s.desc}</p></div>
        <div class="chip stamp">${price(s.preco, 300)}</div></div>` });
   });
   BEATS.push({ t: 450, bg: 'white', fx: 'flash', html: `<div class="big slam" style="font-size:340px">Atenção!</div>` });
