@@ -1,0 +1,36 @@
+<title>Vídeo TV Negueba</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Player em tela cheia: o vídeo da TV em loop, sem som, começa sozinho. */
+:root { --bg: #000000; --fg: #ffffff; --btn: rgba(122,9,17,.92); color-scheme: dark; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; font-family: Arial, sans-serif;
+  padding-left: max(0px, env(safe-area-inset-left, 0px)); padding-right: max(0px, env(safe-area-inset-right, 0px)); }
+video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--bg); }
+#fs { position: fixed; z-index: 2; top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  font: 700 18px Arial, sans-serif; color: var(--fg); background: var(--btn); border: 2px solid rgba(255,255,255,.7);
+  border-radius: 999px; padding: 14px 26px; cursor: pointer; transition: opacity .4s; }
+#fs:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+body.idle #fs { opacity: 0; pointer-events: none; }
+body.idle { cursor: none; }
+</style>
+<video id="v" src="negueba-tv-web.mp4" autoplay muted loop playsinline preload="auto"></video>
+<button id="fs" type="button" autofocus>Tela cheia</button>
+<script>
+(function () {
+  const v = document.getElementById('v');
+  const tryPlay = () => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+  tryPlay(); v.addEventListener('pause', () => setTimeout(tryPlay, 500)); v.addEventListener('ended', tryPlay);
+  document.getElementById('fs').addEventListener('click', () => {
+    tryPlay();
+    const el = document.documentElement;
+    const p = document.fullscreenElement ? document.exitFullscreen() : (el.requestFullscreen ? el.requestFullscreen() : (v.webkitEnterFullscreen ? v.webkitEnterFullscreen() : null));
+    if (p && p.catch) p.catch(() => {});
+  });
+  async function wake() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {} }
+  wake(); document.addEventListener('visibilitychange', () => { if (!document.hidden) { wake(); tryPlay(); } });
+  let t;
+  function poke() { document.body.classList.remove('idle'); clearTimeout(t); t = setTimeout(() => document.body.classList.add('idle'), 4000); }
+  addEventListener('mousemove', poke); addEventListener('keydown', poke); poke();
+})();
+</script>
