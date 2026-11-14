@@ -100,7 +100,10 @@ td.pts { font-weight: 700; color: var(--chalk); }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field input[type=text] { background: var(--night); border: 1px solid var(--line); border-radius: 10px; padding: 12px; width: 100%; }
-.swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.tn-btn { background: none; border: 0; padding: 0; display: flex; align-items: center; gap: 8px; min-width: 0; text-align: left; }
+.tn-btn span:last-child { text-decoration: underline dotted var(--line); text-underline-offset: 3px; }
+.edit-row { display: grid; grid-template-columns: 1fr 90px; gap: 10px; }
 .sw { aspect-ratio: 1; max-width: 100%; border-radius: 50%; border: 2px solid var(--line); }
 .sw[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--night), 0 0 0 5px var(--amber); }
 .forms { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -357,12 +360,18 @@ function step(m) {
 function simulate(tU, tD) { const m = createMatch(tU, tD, [0, 1]); while (!m.over) step(m); return m; }
 
 /* ================= DADOS DA LIGA ================= */
-const COLORS = ['#e63946','#f4a261','#ffd23f','#2a9d8f','#1d4ed8','#7b2cbf','#111827','#f8fafc','#16a34a','#ec4899','#0ea5e9','#92400e'];
-const NAMES = {
-  A: ['Gude FC','Atlético Esfera','Real Rolamento','Sport Bilha','Unidos do Quique','Clube Redondo','Estrela Polida','Imperial Bolão'],
-  B: ['Bolota EC','Ferroviário Pingue','Náutico Vidrinho','Santa Bolinha','Grêmio Giratório','Operário Rolê','Tupi Esférico','Ypiranga Quica'],
-  C: ['Juventude Miçanga','Vila Gude','Tabajara FC','Bola Murcha EC','Pinguim do Vale','Mirim Rolante','Canarinho Quica'],
+const COLORS = ['#c8102e','#e63946','#f4a261','#ffd23f','#16a34a','#006437','#2a9d8f','#0ea5e9','#1d4ed8','#7b2cbf','#7a1631','#ec4899','#92400e','#9ca3af','#111111','#f8fafc'];
+/* Clubes reais: [nome, sigla, cor principal, cor do detalhe] — dá para editar na aba Tabela */
+const CLUBS = {
+  A: [['Flamengo','FLA','#c8102e','#111111'],['Palmeiras','PAL','#006437','#f8fafc'],['Corinthians','COR','#f8fafc','#111111'],['São Paulo','SAO','#f8fafc','#c8102e'],
+      ['Atlético-MG','CAM','#111111','#f8fafc'],['Grêmio','GRE','#0ea5e9','#111111'],['Internacional','INT','#c8102e','#f8fafc'],['Fluminense','FLU','#7a1631','#006437']],
+  B: [['Botafogo','BOT','#111111','#9ca3af'],['Cruzeiro','CRU','#1d4ed8','#f8fafc'],['Vasco','VAS','#111111','#c8102e'],['Santos','SAN','#f8fafc','#111111'],
+      ['Bahia','BAH','#1d4ed8','#c8102e'],['Fortaleza','FOR','#c8102e','#1d4ed8'],['Athletico-PR','CAP','#e63946','#111111'],['Bragantino','RBB','#f8fafc','#e63946']],
+  C: [['Sport','SPT','#111111','#e63946'],['Ceará','CEA','#f8fafc','#111111'],['Vitória','VIT','#c8102e','#111111'],['Goiás','GOI','#16a34a','#f8fafc'],
+      ['Coritiba','CFC','#f8fafc','#006437'],['Paysandu','PAY','#0ea5e9','#f8fafc'],['Cuiabá','CUI','#ffd23f','#16a34a']],
 };
+const OLD_NAMES = ['Gude FC','Atlético Esfera','Real Rolamento','Sport Bilha','Unidos do Quique','Clube Redondo','Estrela Polida','Imperial Bolão','Bolota EC','Ferroviário Pingue','Náutico Vidrinho','Santa Bolinha','Grêmio Giratório','Operário Rolê','Tupi Esférico','Ypiranga Quica','Juventude Miçanga','Vila Gude','Tabajara FC','Bola Murcha EC','Pinguim do Vale','Mirim Rolante','Canarinho Quica'];
+const CLUB_LIST = [...CLUBS.A, ...CLUBS.B, ...CLUBS.C];
 const PNAMES = ['Bolinha','Gudinho','Pipoca','Tatu','Quique','Rolinha','Pingo','Zé Bola','Bilha','Miçanga','Tico','Tampinha','Botão','Grão','Esferinha','Bolota','Peteca','Pião','Caroço','Jabuti','Feijão','Coquinho','Bituca','Rolemã','Pitoco','Biloca','Tatuzinho','Bolacha'];
 const DIVS = ['A', 'B', 'C'];
 const DIVNAME = { A: 'Série A', B: 'Série B', C: 'Série C' };
@@ -379,9 +388,9 @@ function makePlayers(base, names) {
     return { name: n, num: i === 0 ? 1 : nums[i], vel: st(), chu: st(), def: i === 0 ? clamp(st() + 6, 20, 99) : st(), goals: 0 };
   });
 }
-function makeAI(name, div, k) {
-  const c1 = COLORS[k % COLORS.length]; let c2 = COLORS[(k * 5 + 7) % COLORS.length]; if (c2 === c1) c2 = '#f8fafc';
-  return { id: 't' + k, name, abbr: abbr(name), c1, c2, formation: pick(Object.keys(FORM)), players: makePlayers(DIVBASE[div]) };
+function makeAI(club, div, k) {
+  const [name, ab, c1, c2] = Array.isArray(club) ? club : [club, abbr(club), COLORS[k % COLORS.length], '#f8fafc'];
+  return { id: 't' + k, name, abbr: ab, c1, c2, formation: pick(Object.keys(FORM)), players: makePlayers(DIVBASE[div]) };
 }
 function roundRobin(ids) {
   const arr = ids.slice().sort(() => Math.random() - .5), n = arr.length, rounds = [];
@@ -395,7 +404,7 @@ function roundRobin(ids) {
 function newCareer(user) {
   const teams = {}, divisions = { A: [], B: [], C: [] };
   let k = 0;
-  for (const d of DIVS) for (const n of NAMES[d]) { const t = makeAI(n, d, k++); teams[t.id] = t; divisions[d].push(t.id); }
+  for (const d of DIVS) for (const n of CLUBS[d]) { const t = makeAI(n, d, k++); teams[t.id] = t; divisions[d].push(t.id); }
   teams.user = user; divisions.C.push('user');
   const s = { v: 1, season: 1, round: 0, coins: 300, teams, divisions, fixtures: {}, results: {}, history: [], last: null };
   startSeason(s);
@@ -467,13 +476,18 @@ function endSeason(s) {
 const KEY = 'liga-bolinhas-v1';
 let S = null;
 try { const raw = localStorage.getItem(KEY); if (raw) S = JSON.parse(raw); } catch (e) { S = null; }
+/* carreiras antigas: troca os nomes inventados pelos clubes reais, mantendo a força de cada time */
+if (S) for (const t of Object.values(S.teams)) {
+  const k = OLD_NAMES.indexOf(t.name);
+  if (k >= 0) [t.name, t.abbr, t.c1, t.c2] = CLUB_LIST[k];
+}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 /* ================= UI ================= */
 const $ = id => document.getElementById(id);
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const badge = (t, cls = '') => `<span class="badge ${cls}" style="background:${t.c1};border-color:${t.c2}"></span>`;
-let tab = 'home', viewDiv = null;
+let tab = 'home', viewDiv = null, editId = null;
 const draft = { name: 'Bolinhas FC', abbr: 'BOL', c1: '#ffd23f', c2: '#1d4ed8', formation: '1-2-1', names: ['Muralha', 'Zagueirão', 'Ligeirinho', 'Maestro', 'Artilheiro'] };
 
 function header() {
@@ -574,19 +588,39 @@ function tableView() {
   for (const id of S.divisions[d]) for (const p of S.teams[id].players) if (p.goals) scorers.push({ p, t: S.teams[id] });
   scorers.sort((a, b) => b.p.goals - a.p.goals);
   return `
+  ${editId ? editCard() : ''}
   <div class="seg">${DIVS.map(x => `<button data-act="div" data-d="${x}" aria-pressed="${x === d}">${DIVNAME[x]}</button>`).join('')}</div>
   <div class="card" style="padding:12px 10px">
     <div style="overflow-x:auto"><table>
       <thead><tr><th style="text-align:center">#</th><th>Time</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>SG</th></tr></thead>
       <tbody>${tbl.map((r, i) => { const t = S.teams[r.id];
         const cls = [(d !== 'A' && i < 2) ? 'up' : '', (d !== 'C' && i >= 6) ? 'down' : '', r.id === 'user' ? 'me' : ''].join(' ');
-        return `<tr class="${cls}"><td class="pos">${i + 1}</td><td><span class="tn">${badge(t)}<span>${esc(t.name)}</span></span></td><td class="pts">${r.pts}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.dr}</td><td>${r.gp - r.gc > 0 ? '+' : ''}${r.gp - r.gc}</td></tr>`; }).join('')}</tbody>
+        return `<tr class="${cls}"><td class="pos">${i + 1}</td><td><button class="tn-btn" data-act="edit" data-id="${r.id}" aria-label="Editar ${esc(t.name)}">${badge(t)}<span>${esc(t.name)}</span></button></td><td class="pts">${r.pts}</td><td>${r.j}</td><td>${r.v}</td><td>${r.e}</td><td>${r.dr}</td><td>${r.gp - r.gc > 0 ? '+' : ''}${r.gp - r.gc}</td></tr>`; }).join('')}</tbody>
     </table></div>
     <div class="legend">${d !== 'A' ? '<span><i style="background:var(--good)"></i>Acesso</span>' : ''}${d !== 'C' ? '<span><i style="background:var(--bad)"></i>Rebaixamento</span>' : ''}</div>
   </div>
   <div class="card scorers"><span class="label">Artilharia · ${DIVNAME[d]}</span>
     ${scorers.length ? `<ol>${scorers.slice(0, 8).map(x => `<li><span class="row">${badge(x.t)} ${esc(x.p.name)} <span class="muted">${esc(x.t.abbr)}</span></span><b>${x.p.goals}</b></li>`).join('')}</ol>` : '<span class="muted">Nenhum gol marcado ainda nesta temporada.</span>'}
   </div>`;
+}
+function editCard() {
+  const t = S.teams[editId];
+  const sw = k => `<div class="swatches">${COLORS.map(c => `<button class="sw" data-act="ecolor" data-k="${k}" data-c="${c}" style="background:${c}" aria-label="Cor ${c}" aria-pressed="${t[k] === c}"></button>`).join('')}</div>`;
+  return `<div class="card">
+    <div class="row">${badge(t, 'lg')}<div><span class="label">Editar time</span><h2>${esc(t.name)}</h2></div></div>
+    <div class="edit-row">
+      <div class="field"><span class="label">Nome</span><input type="text" id="e-name" maxlength="24" value="${esc(t.name)}"></div>
+      <div class="field"><span class="label">Sigla</span><input type="text" id="e-abbr" maxlength="3" value="${esc(t.abbr)}"></div>
+    </div>
+    <div class="field"><span class="label">Cor principal</span>${sw('c1')}</div>
+    <div class="field"><span class="label">Cor do detalhe</span>${sw('c2')}</div>
+    <div class="btns"><button class="btn primary" data-act="esave">Salvar</button><button class="btn" data-act="eclose">Fechar</button></div>
+  </div>`;
+}
+function readEdit() {
+  const t = S.teams[editId]; if (!t || !$('e-name')) return;
+  t.name = $('e-name').value.trim() || t.name;
+  t.abbr = ($('e-abbr').value.trim() || t.abbr).toUpperCase().slice(0, 3);
 }
 const cost = v => v + 10;
 function squadView() {
@@ -631,7 +665,7 @@ function gamesView() {
 /* ================= EVENTOS ================= */
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act], [data-tab]'); if (!b) return;
-  if (b.dataset.tab) { tab = b.dataset.tab; viewDiv = null; render(); $('view').scrollTop = 0; return; }
+  if (b.dataset.tab) { tab = b.dataset.tab; viewDiv = null; editId = null; render(); $('view').scrollTop = 0; return; }
   const a = b.dataset.act;
   if (a === 'color') { readDraft(); draft[b.dataset.k] = b.dataset.c; render(); }
   else if (a === 'form') {
@@ -645,6 +679,10 @@ document.addEventListener('click', e => {
     save(); tab = 'home'; render();
   }
   else if (a === 'div') { viewDiv = b.dataset.d; render(); }
+  else if (a === 'edit') { editId = b.dataset.id; render(); $('view').scrollTop = 0; }
+  else if (a === 'ecolor') { readEdit(); S.teams[editId][b.dataset.k] = b.dataset.c; save(); render(); }
+  else if (a === 'esave') { readEdit(); save(); editId = null; render(); }
+  else if (a === 'eclose') { editId = null; render(); }
   else if (a === 'up') {
     const p = S.teams.user.players[+b.dataset.i], k = b.dataset.k, c = cost(p[k]);
     if (S.coins >= c && p[k] < 99) { S.coins -= c; p[k]++; save(); const st = $('view').scrollTop; render(); $('view').scrollTop = st; }
