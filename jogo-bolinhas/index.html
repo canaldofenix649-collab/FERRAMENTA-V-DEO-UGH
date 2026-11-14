@@ -198,13 +198,17 @@ td.pts { font-weight: 700; color: var(--chalk); }
 <script>
 (() => {
 /* ================= MOTOR DE FÍSICA ================= */
-const W = 300, H = 480, GW = 100, PR = 12, BR = 7, FRAMES = 3600, DT = 1 / 60;
+const W = 340, H = 540, GW = 88, PR = 9, BR = 5, FRAMES = 3600, DT = 1 / 60, SC = 1.12;
+/* posições de linha (x, y) para o time que ataca para cima — defensores primeiro, atacantes por último */
+const D4 = [[.14,.80],[.38,.84],[.62,.84],[.86,.80]];
 const FORM = {
-  '2-2':   [[.28,.80],[.72,.80],[.30,.58],[.70,.58]],
-  '1-2-1': [[.50,.82],[.22,.68],[.78,.68],[.50,.54]],
-  '3-1':   [[.18,.79],[.50,.82],[.82,.79],[.50,.57]],
-  '1-3':   [[.50,.81],[.20,.60],[.50,.55],[.80,.60]],
+  '4-4-2':   [...D4, [.14,.62],[.38,.66],[.62,.66],[.86,.62], [.38,.53],[.62,.53]],
+  '4-3-3':   [...D4, [.28,.67],[.50,.70],[.72,.67], [.16,.54],[.50,.52],[.84,.54]],
+  '3-5-2':   [[.25,.82],[.50,.85],[.75,.82], [.08,.65],[.30,.68],[.50,.71],[.70,.68],[.92,.65], [.38,.53],[.62,.53]],
+  '4-2-3-1': [...D4, [.38,.71],[.62,.71], [.16,.60],[.50,.61],[.84,.60], [.50,.52]],
 };
+const formOf = t => FORM[t.formation] ? t.formation : '4-4-2';
+const slotRole = (t, i) => { if (i === 0) return 'Goleiro'; const y = FORM[formOf(t)][i - 1][1]; return y > .76 ? 'Defesa' : y > .58 ? 'Meio' : 'Ataque'; };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -219,14 +223,14 @@ function createMatch(tU, tD, aiSides) {
   m.ball = { x: W / 2, y: H / 2, vx: 0, vy: 0, r: BR, m: 0.35, ball: true };
   [tU, tD].forEach((t, side) => t.players.forEach((p, i) => {
     m.bodies.push({ side, idx: i, gk: i === 0, p, r: PR, m: 1 + p.def / 90, x: 0, y: 0, vx: 0, vy: 0, cd: 0,
-      spd: i === 0 ? 50 + p.def * 1.05 : 58 + p.vel * 1.08 });
+      spd: (i === 0 ? 44 + p.def * .95 : 58 + p.vel * 1.08) * SC });
   }));
   kickoff(m);
   return m;
 }
 function basePos(m, b) {
   let fx, fy;
-  if (b.gk) { fx = .5; fy = (H - 18) / H; } else { [fx, fy] = FORM[m.teams[b.side].formation][b.idx - 1]; }
+  if (b.gk) { fx = .5; fy = (H - 14) / H; } else { [fx, fy] = FORM[formOf(m.teams[b.side])][b.idx - 1]; }
   let x = fx * W, y = fy * H;
   if (b.side === 1) { x = W - x; y = H - y; }
   return { x, y };
@@ -234,14 +238,18 @@ function basePos(m, b) {
 function kickoff(m) {
   for (const b of m.bodies) {
     const p = basePos(m, b);
-    b.x = p.x; b.y = b.side === 0 ? Math.max(p.y, H / 2 + 26) : Math.min(p.y, H / 2 - 26);
+    b.x = p.x; b.y = b.side === 0 ? Math.max(p.y, H / 2 + 20) : Math.min(p.y, H / 2 - 20);
     b.vx = b.vy = 0; b.cd = .3;
   }
   Object.assign(m.ball, { x: W / 2 + rnd(-4, 4), y: H / 2, vx: 0, vy: 0 });
   m.freeze = 45; m.lastTouch = null;
 }
 function collide(a, b, e) {
-  const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = a.r + b.r;
+  const dx = b.x - a.x, min = a.r + b.r;
+  if (dx > min || dx < -min) return false;
+  const dy = b.y - a.y;
+  if (dy > min || dy < -min) return false;
+  const d = Math.sqrt(dx * dx + dy * dy);
   if (d === 0 || d >= min) return false;
   const nx = dx / d, ny = dy / d, ov = min - d, ia = 1 / a.m, ib = 1 / b.m, im = ia + ib;
   a.x -= nx * ov * ia / im; a.y -= ny * ov * ia / im; b.x += nx * ov * ib / im; b.y += ny * ov * ib / im;
@@ -254,17 +262,17 @@ function kick(m, b) {
   const deep = (ball.y - H / 2) * (-d) > H * 0.28;
   let tx, ty, pw;
   if (b.gk || deep) { tx = W / 2 + rnd(-.4, .4) * W; ty = g.y; pw = .85; }
-  else if (dist(ball, g) < 190) { tx = W / 2 + rnd(-.5, .5) * (GW - 26); ty = g.y; pw = 1; }
+  else if (dist(ball, g) < 250) { tx = W / 2 + rnd(-.5, .5) * (GW - 18); ty = g.y; pw = 1; }
   else {
     const mates = m.bodies.filter(o => o.side === s && !o.gk && o !== b && (o.y - ball.y) * d > 24);
     if (mates.length && Math.random() < .45) {
       const o = mates[Math.floor(Math.random() * mates.length)];
-      tx = o.x + o.vx * .3; ty = o.y + d * 10; pw = clamp(dist(o, ball) / 340, .45, .8);
+      tx = o.x + o.vx * .3; ty = o.y + d * 10; pw = clamp(dist(o, ball) / 380, .45, .8);
     } else { tx = ball.x + rnd(-30, 30); ty = ball.y + d * 120; pw = .5; }
   }
   const acc = (100 - p.chu) / 100;
   const ang = Math.atan2(ty - ball.y, tx - ball.x) + gauss() * acc * .33;
-  const sp = (215 + p.chu * 3.1) * pw;
+  const sp = (225 + p.chu * 3.2) * pw * SC;
   ball.vx = Math.cos(ang) * sp + b.vx * .3; ball.vy = Math.sin(ang) * sp + b.vy * .3;
   m.lastTouch = b; b.cd = .45;
 }
@@ -292,8 +300,13 @@ function step(m) {
   const ball = m.ball;
   const role = new Map();
   for (const s of [0, 1]) {
-    const out = m.bodies.filter(b => b.side === s && !b.gk).sort((a, b) => dist(a, ball) - dist(b, ball));
-    role.set(out[0], 'chase'); role.set(out[1], 'support');
+    let b1 = null, b2 = null, d1 = 1e9, d2 = 1e9;
+    for (const b of m.bodies) {
+      if (b.side !== s || b.gk) continue;
+      const dd = (b.x - ball.x) ** 2 + (b.y - ball.y) ** 2;
+      if (dd < d1) { b2 = b1; d2 = d1; b1 = b; d1 = dd; } else if (dd < d2) { b2 = b; d2 = dd; }
+    }
+    role.set(b1, 'chase'); role.set(b2, 'support');
   }
   for (const b of m.bodies) {
     const s = b.side, d = ad(s);
@@ -301,27 +314,27 @@ function step(m) {
     const r = role.get(b);
     if (b.gk) {
       const og = ownGoal(s);
-      if (dist(ball, og) < 80 && dist(b, ball) < 60) { tx = ball.x; ty = ball.y; }
+      if (dist(ball, og) < 75 && dist(b, ball) < 55) { tx = ball.x; ty = ball.y; }
       else {
         tx = clamp(ball.x, W / 2 - GW / 2 + 8, W / 2 + GW / 2 - 8);
-        ty = og.y + (s === 0 ? -16 : 16) + (s === 0 ? -1 : 1) * clamp(30 - Math.abs(ball.y - og.y) / 10, 0, 14);
+        ty = og.y + (s === 0 ? -12 : 12) + (s === 0 ? -1 : 1) * clamp(30 - Math.abs(ball.y - og.y) / 10, 0, 12);
       }
     } else if (r === 'chase') {
       const g = oppGoal(s), gx = g.x - ball.x, gy = g.y - ball.y, gl = Math.hypot(gx, gy) || 1;
       const nx = gx / gl, ny = gy / gl, back = PR + BR - 3;
       tx = ball.x - nx * back; ty = ball.y - ny * back;
       if ((b.y - ball.y) * d > 4) { // está na frente da bola: contorna por trás
-        tx = ball.x + (b.x < ball.x ? -1 : 1) * 16; ty = ball.y - d * (PR + BR + 8);
+        tx = ball.x + (b.x < ball.x ? -1 : 1) * 12; ty = ball.y - d * (PR + BR + 7);
       }
     } else {
       const bp = basePos(m, b);
-      tx = bp.x + (ball.x - W / 2) * .35;
-      ty = bp.y + (ball.y - H / 2) * .45 + d * m.tactic[s] * 30;
-      if (r === 'support') { tx = ball.x * .5 + bp.x * .5; ty = ball.y + d * 60 + d * m.tactic[s] * 10; }
+      tx = bp.x + (ball.x - W / 2) * .3;
+      ty = bp.y + (ball.y - H / 2) * .5 + d * m.tactic[s] * 30;
+      if (r === 'support') { tx = ball.x * .5 + bp.x * .5; ty = ball.y + d * 65 + d * m.tactic[s] * 10; }
       tx = clamp(tx, PR, W - PR); ty = clamp(ty, PR + 10, H - PR - 10);
     }
     const dx = tx - b.x, dy = ty - b.y, dl = Math.hypot(dx, dy) || 1;
-    const sp = b.spd * Math.min(1, dl / 18);
+    const sp = b.spd * Math.min(1, dl / 14);
     const k = Math.min(1, DT * 7);
     b.vx += (dx / dl * sp - b.vx) * k; b.vy += (dy / dl * sp - b.vy) * k;
     b.x += b.vx * DT; b.y += b.vy * DT; b.cd -= DT;
@@ -331,7 +344,7 @@ function step(m) {
   for (let i = 0; i < nb; i++) { const b = m.bodies[(i + off) % nb]; if (b.cd <= 0 && dist(b, ball) < b.r + ball.r + 3) { kick(m, b); break; } }
   // bola
   const bs = Math.hypot(ball.vx, ball.vy);
-  if (bs > 620) { ball.vx *= 620 / bs; ball.vy *= 620 / bs; }
+  if (bs > 680) { ball.vx *= 680 / bs; ball.vy *= 680 / bs; }
   ball.x += ball.vx * DT; ball.y += ball.vy * DT; ball.vx *= .985; ball.vy *= .985;
   // colisões
   const all = m.bodies;
@@ -387,6 +400,30 @@ const CLUBS = {
       ['Ypiranga-RS','YPI','#ffd23f','#16a34a','h'],['Maringá','MAR','#111111','#f8fafc',''],['Floresta','FLO','#16a34a','#f8fafc','h'],['Inter de Limeira','INL','#111111','#f8fafc','h'],
       ['Anápolis','ANA','#c8102e','#f8fafc',''],['Itabaiana','ITA','#1d4ed8','#c8102e',''],['Maranhão','MAA','#1d4ed8','#c8102e','v'],['Barra','BAR','#0ea5e9','#111111','']],
 };
+/* Elencos da Série A 2026 (goleiro primeiro). Séries B e C usam apelidos — dá para editar no Elenco. */
+const _ = null; // posição sem nome confirmado: recebe um apelido
+const SQUADS = {
+  FLA: ['Rossi','Varela','Léo Ortiz','Léo Pereira','Alex Sandro','Jorginho','Pulgar','De la Cruz','Arrascaeta','Samuel Lino','Pedro'],
+  PAL: ['Weverton','Giay','Gustavo Gómez','Murilo','Piquerez','Aníbal Moreno','Andreas Pereira','Raphael Veiga','Felipe Anderson','Vitor Roque','Flaco López'],
+  BOT: ['John','Vitinho','Barboza','Bastos','Alex Telles','Danilo','Marlon Freitas','Savarino','Matheus Martins','Artur','Arthur Cabral'],
+  CRU: ['Cássio','William','Jonathan Jesus','Villalba','Kaiki','Lucas Romero','Lucas Silva','Christian','Matheus Pereira','Wanderson','Kaio Jorge'],
+  FLU: ['Fábio','Samuel Xavier','Thiago Silva','Freytes','Renê','Martinelli','Hércules','Nonato','Ganso','Canobbio','Germán Cano'],
+  SAO: ['Rafael','Cédric','Arboleda','Alan Franco','Wendell','Pablo Maia','Marcos Antônio','Alisson','Luciano','Lucas Moura','Calleri'],
+  CAM: ['Everson','Natanael','Junior Alonso','Lyanco','Guilherme Arana','Alan Franco','Fausto Vera','Gustavo Scarpa','Igor Gomes','Hulk','Rony'],
+  INT: ['Rochet','Aguirre','Vitão','Juninho','Bernabei','Thiago Maia','Bruno Henrique','Alan Patrick','Carbonero','Vitinho','Borré'],
+  COR: ['Hugo Souza','Matheuzinho','Gustavo Henrique','André Ramalho','Hugo','Raniele','Breno Bidon','Garro','Carrillo','Memphis','Yuri Alberto'],
+  BAH: ['Marcos Felipe','Gilberto','Gabriel Xavier','Kanu','Luciano Juba','Caio Alexandre','Jean Lucas','Everton Ribeiro','Cauly','Erick Pulga','Willian José'],
+  GRE: ['Tiago Volpi','João Pedro','Kannemann','Wagner Leonardo','Marlon','Dodi','Villasanti','Edenilson','Cristaldo','Amuzu','Braithwaite'],
+  RBB: ['Cleiton','Andrés Hurtado','Pedro Henrique','Guzmán Rodríguez','Juninho Capixaba','Gabriel','Eric Ramires','Jhon Jhon','Vinicinho','Sasha','Pitta'],
+  VAS: ['Léo Jardim','Paulo Henrique','Lucas Freitas','Robert Renan','Lucas Piton','Hugo Moura','Tchê Tchê','Coutinho','Nuno Moreira','Rayan','Vegetti'],
+  SAN: ['Brazão','Igor Vinícius','Zé Ivaldo','Luan Peres','Escobar','Zé Rafael','João Schmidt','Rollheiser','Barreal','Guilherme','Neymar'],
+  MIR: ['Walter','Lucas Ramon','João Victor','Jemmes','Reinaldo','Neto Moura','Danielzinho','Shaylon','Chico Kim','Negueba','Carlos Eduardo'],
+  CAP: ['Santos','Gilberto','Habraão','Lucas Belezi','Claudinho','Portilla','Zapelli','Chiqueti','Dudu Kogitzki','Mendoza','Viveros'],
+  VIT: ['Lucas Arcanjo','Raúl Cáceres','Neris','Lucas Halter','Jamerson','Ronald','Baralhas','Matheuzinho','Osvaldo','Erick','Renato Kayzer'],
+  CFC: ['Pedro Morisco',_,_,_,_,'Willian Oliveira','Josué','Clayson','Lucas Ronier',_,'Pedro Rocha'],
+  CHA: ['Anderson',_,'Fabrício Bruno',_,_,_,'Jean Carlos',_,'Walter Clar',_,'Bruno Rangel'],
+  REM: ['Marcelo Rangel',_,'Marllon','Banguera',_,'Cantillo','Poveda','Jajá','Diego Hernández','Yago Pikachu','Alef Manga'],
+};
 const PATTERNS = [['', 'Lisa'], ['v', 'Listras'], ['h', 'Listras deitadas'], ['b', 'Faixa'], ['d', 'Faixa diagonal']];
 const PNAMES = ['Bolinha','Gudinho','Pipoca','Tatu','Quique','Rolinha','Pingo','Zé Bola','Bilha','Miçanga','Tico','Tampinha','Botão','Grão','Esferinha','Bolota','Peteca','Pião','Caroço','Jabuti','Feijão','Coquinho','Bituca','Rolemã','Pitoco','Biloca','Tatuzinho','Bolacha'];
 const DIVS = ['A', 'B', 'C'];
@@ -396,17 +433,19 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const abbr = n => n.replace(/\b(FC|EC|do|da|de|dos)\b/g, '').trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().padEnd(3, n.replace(/\s/g, '').toUpperCase().slice(1)).slice(0, 3);
 
 function makePlayers(base, names) {
-  const used = new Set(); const nums = [2,3,4,5,6,7,8,9,10,11].sort(() => Math.random() - .5);
-  return [0, 1, 2, 3, 4].map(i => {
-    let n = names ? names[i] : pick(PNAMES); while (!names && used.has(n)) n = pick(PNAMES); used.add(n);
+  const used = new Set(names || []);
+  return Array.from({ length: 11 }, (_, i) => {
+    let n = names && names[i];
+    if (!n) { n = pick(PNAMES); while (used.has(n)) n = pick(PNAMES); }
+    used.add(n);
     const st = () => clamp(Math.round(base + rnd(-6, 6)), 20, 99);
-    return { name: n, num: i === 0 ? 1 : nums[i], vel: st(), chu: st(), def: i === 0 ? clamp(st() + 6, 20, 99) : st(), goals: 0 };
+    return { name: n, num: i + 1, vel: st(), chu: st(), def: i === 0 ? clamp(st() + 6, 20, 99) : st(), goals: 0 };
   });
 }
 function makeAI(club, div, k, idx = 10, n = 20) {
   const [name, ab, c1, c2, pt] = Array.isArray(club) ? club : [club, abbr(club), COLORS[k % COLORS.length], '#f8fafc', ''];
   const base = DIVBASE[div] + 6 - 12 * idx / Math.max(1, n - 1);
-  return { id: 't' + k, name, abbr: ab, c1, c2, pt: pt || '', formation: pick(Object.keys(FORM)), players: makePlayers(base) };
+  return { id: 't' + k, name, abbr: ab, c1, c2, pt: pt || '', formation: pick(Object.keys(FORM)), players: makePlayers(base, SQUADS[ab]) };
 }
 function roundRobin(ids) {
   const arr = ids.slice().sort(() => Math.random() - .5), n = arr.length, rounds = [];
@@ -497,6 +536,18 @@ function endSeason(s) {
 const KEY = 'liga-bolinhas-v2';
 let S = null;
 try { const raw = localStorage.getItem(KEY); if (raw) S = JSON.parse(raw); } catch (e) { S = null; }
+/* carreiras já começadas: troca os apelidos pelos jogadores reais (não mexe em nomes que você editou) */
+if (S) for (const t of Object.values(S.teams)) {
+  if (t.players.length < 11) {
+    const avg = Math.round(t.players.reduce((a, p) => a + (p.vel + p.chu + p.def) / 3, 0) / t.players.length);
+    const extra = makePlayers(avg, t.players.map(p => p.name));
+    t.players = t.players.concat(extra.slice(t.players.length));
+    t.players.forEach((p, i) => { p.num = i + 1; });
+  }
+  if (!FORM[t.formation]) t.formation = '4-4-2';
+  const sq = SQUADS[t.abbr];
+  if (sq && t.players.every(p => PNAMES.includes(p.name))) t.players.forEach((p, i) => { if (sq[i]) p.name = sq[i]; });
+}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 /* ================= UI ================= */
@@ -512,7 +563,7 @@ const rounds = () => S.fixtures[userDiv(S)].length;
 const divSize = d => S.divisions[d].length;
 const patPicker = (cur, act) => `<div class="seg" style="grid-auto-flow:row;grid-template-columns:repeat(3,1fr)">${PATTERNS.map(([v, l]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${(cur || '') === v}">${l}</button>`).join('')}</div>`;
 let tab = 'home', viewDiv = null, editId = null;
-const draft = { mode: 'real', real: ['A', 0], replace: 19, pt: '', name: 'Bolinhas FC', abbr: 'BOL', c1: '#ffd23f', c2: '#1d4ed8', formation: '1-2-1', names: ['Muralha', 'Zagueirão', 'Ligeirinho', 'Maestro', 'Artilheiro'] };
+const draft = { mode: 'real', real: ['A', 0], replace: 19, pt: '', name: 'Bolinhas FC', abbr: 'BOL', c1: '#ffd23f', c2: '#1d4ed8', formation: '4-4-2', names: ['Muralha', 'Lateral', 'Xerife', 'Paredão', 'Foguetinho', 'Volante', 'Motorzinho', 'Maestro', 'Ponta', 'Ligeirinho', 'Artilheiro'] };
 
 function header() {
   $('coins').textContent = S ? S.coins : 0;
@@ -537,7 +588,7 @@ function drawFormation(c, f) {
   x.strokeStyle = 'rgba(255,255,255,.5)'; x.lineWidth = 1.5; x.strokeRect(4, 4, 82, 112);
   x.beginPath(); x.moveTo(4, 60); x.lineTo(86, 60); x.stroke();
   const pts = [[.5, .93]].concat(FORM[f]);
-  for (const [fx, fy] of pts) { x.beginPath(); x.arc(4 + fx * 82, 4 + (fy * 1.9 - .9) * 112, 6, 0, 7); x.fillStyle = '#ffb547'; x.fill(); }
+  for (const [fx, fy] of pts) { x.beginPath(); x.arc(4 + fx * 82, 4 + (fy * 2.4 - 1.3) * 112, 4.5, 0, 7); x.fillStyle = '#ffb547'; x.fill(); }
 }
 
 function createView() {
@@ -564,7 +615,7 @@ function createView() {
     <div class="field"><span class="label">Formação</span>${formPicker(draft.formation)}</div>
     <div class="field"><span class="label">Jogadores</span>
       ${draft.names.map((n, i) => `<input type="text" id="c-p${i}" maxlength="14" value="${esc(n)}" aria-label="Jogador ${i + 1}" style="margin-top:${i ? 6 : 0}px">`).join('')}
-      <span class="muted" style="font-size:12px">O primeiro é o goleiro.</span>
+      <span class="muted" style="font-size:12px">O primeiro é o goleiro; depois defesa, meio e ataque.</span>
     </div>
     <div class="field"><span class="label">Seu time entra no lugar de</span>
       <select id="c-repl" style="background:var(--night);border:1px solid var(--line);border-radius:10px;padding:12px">${CLUBS.C.map((c, i) => `<option value="${i}" ${i === draft.replace ? 'selected' : ''}>${esc(c[0])}</option>`).join('')}</select>
@@ -678,7 +729,7 @@ function squadView() {
     ${t.players.map((p, i) => `<div class="player">
       <span class="pnum" style="background:${i ? t.c1 : t.c2};border-color:${i ? t.c2 : t.c1};color:${i ? t.c2 : t.c1}">${p.num}</span>
       <div style="min-width:0">
-        <div class="pname"><input type="text" value="${esc(p.name)}" maxlength="14" data-act="rename" data-i="${i}" id="pn${i}" aria-label="Nome do jogador"><span class="muted" style="font-size:12px;white-space:nowrap">${i ? 'Linha' : 'Goleiro'} · ${p.goals} gols</span></div>
+        <div class="pname"><input type="text" value="${esc(p.name)}" maxlength="14" data-act="rename" data-i="${i}" id="pn${i}" aria-label="Nome do jogador"><span class="muted" style="font-size:12px;white-space:nowrap">${slotRole(t, i)} · ${p.goals} gols</span></div>
         <div class="stats">${statRow(p, i, 'vel', 'VEL')}${statRow(p, i, 'chu', 'CHU')}${statRow(p, i, 'def', 'DEF')}</div>
       </div></div>`).join('')}
   </div>
@@ -755,7 +806,7 @@ function finishUser(f, hg, ag) {
 }
 
 /* ================= TELA DA PARTIDA ================= */
-const MX = 10, MY = 18, CW = W + MX * 2, CH = H + MY * 2;
+const MX = 6, MY = 14, CW = W + MX * 2, CH = H + MY * 2;
 const cv = $('pitch'), ctx = cv.getContext('2d');
 let M = null, F = null, speed = 1, pauseF = 0, flash = null, raf = 0, scale = 1;
 
@@ -782,7 +833,7 @@ $('skip').addEventListener('click', () => { if (!M || M.over) return; M.onGoal =
 function updateBoard() {
   $('sc').textContent = `${M.score[0]} - ${M.score[1]}`;
   $('clk').textContent = M.over ? 'Fim' : `${Math.min(90, Math.floor(M.t / 40))}'`;
-  const evs = M.events.slice(-3).map(e => `${e.min}' ${e.side === 0 ? M.teams[0].abbr : M.teams[1].abbr} ${e.own ? '(contra)' : e.name}`);
+  const evs = M.events.slice(-3).map(e => `${e.min}' ${e.side === 0 ? M.teams[0].abbr : M.teams[1].abbr} ${e.own ? e.name + ' (contra)' : e.name}`);
   if (evs.length) $('feed').textContent = evs.join('  ·  ');
 }
 function resize() {
@@ -825,10 +876,10 @@ function showEnd() {
 function paintKit(c, x, y, r, c1, c2, pt) {
   c.save(); c.beginPath(); c.arc(x, y, r, 0, 7); c.clip();
   c.fillStyle = c1; c.fillRect(x - r, y - r, 2 * r, 2 * r); c.fillStyle = c2;
-  if (pt === 'v') for (let i = -r + 2; i < r; i += 8) c.fillRect(x + i, y - r, 4, 2 * r);
-  else if (pt === 'h') for (let i = -r + 2; i < r; i += 8) c.fillRect(x - r, y + i, 2 * r, 4);
-  else if (pt === 'b') c.fillRect(x - r, y - 3, 2 * r, 6);
-  else if (pt === 'd') { c.translate(x, y); c.rotate(-Math.PI / 4); c.fillRect(-r, -3, 2 * r, 6); }
+  if (pt === 'v') for (let i = -r + 1.5; i < r; i += 5) c.fillRect(x + i, y - r, 2.5, 2 * r);
+  else if (pt === 'h') for (let i = -r + 1.5; i < r; i += 5) c.fillRect(x - r, y + i, 2 * r, 2.5);
+  else if (pt === 'b') c.fillRect(x - r, y - 2, 2 * r, 4);
+  else if (pt === 'd') { c.translate(x, y); c.rotate(-Math.PI / 4); c.fillRect(-r, -2, 2 * r, 4); }
   c.restore();
 }
 function draw() {
@@ -837,11 +888,11 @@ function draw() {
   c.fillStyle = '#0a181c'; c.fillRect(0, 0, CW, CH);
   c.translate(MX, MY);
   // redes
-  for (const gy of [-14, H]) {
-    c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(W / 2 - GW / 2, gy, GW, 14);
+  for (const gy of [-12, H]) {
+    c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(W / 2 - GW / 2, gy, GW, 12);
     c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = .6; c.beginPath();
-    for (let x = W / 2 - GW / 2; x <= W / 2 + GW / 2; x += 6) { c.moveTo(x, gy); c.lineTo(x, gy + 14); }
-    for (let y = gy; y <= gy + 14; y += 5) { c.moveTo(W / 2 - GW / 2, y); c.lineTo(W / 2 + GW / 2, y); }
+    for (let x = W / 2 - GW / 2; x <= W / 2 + GW / 2; x += 6) { c.moveTo(x, gy); c.lineTo(x, gy + 12); }
+    for (let y = gy; y <= gy + 12; y += 4) { c.moveTo(W / 2 - GW / 2, y); c.lineTo(W / 2 + GW / 2, y); }
     c.stroke();
   }
   // gramado listrado
@@ -849,13 +900,14 @@ function draw() {
   c.strokeStyle = 'rgba(255,255,255,.82)'; c.lineWidth = 2;
   c.strokeRect(1, 1, W - 2, H - 2);
   c.beginPath(); c.moveTo(0, H / 2); c.lineTo(W, H / 2); c.stroke();
-  c.beginPath(); c.arc(W / 2, H / 2, 40, 0, 7); c.stroke();
+  c.beginPath(); c.arc(W / 2, H / 2, 46, 0, 7); c.stroke();
   c.beginPath(); c.arc(W / 2, H / 2, 2.5, 0, 7); c.fillStyle = 'rgba(255,255,255,.82)'; c.fill();
   for (const top of [true, false]) {
     const y0 = top ? 0 : H, s = top ? 1 : -1;
-    c.strokeRect(W / 2 - 85, top ? 1 : H - 62, 170, 61);
-    c.strokeRect(W / 2 - 42, top ? 1 : H - 24, 84, 23);
-    c.beginPath(); c.arc(W / 2, y0 + s * 61, 22, top ? 0 : Math.PI, top ? Math.PI : 0); c.stroke();
+    c.strokeRect(W / 2 - 100, top ? 1 : H - 80, 200, 79);
+    c.strokeRect(W / 2 - 50, top ? 1 : H - 28, 100, 27);
+    c.beginPath(); c.arc(W / 2, y0 + s * 54, 2, 0, 7); c.fill();
+    c.beginPath(); c.arc(W / 2, y0 + s * 80, 22, top ? 0 : Math.PI, top ? Math.PI : 0); c.stroke();
   }
   // traves
   c.fillStyle = '#fff';
@@ -865,14 +917,14 @@ function draw() {
   for (const b of m.bodies) { c.beginPath(); c.ellipse(b.x + 2, b.y + 3, b.r, b.r * .85, 0, 0, 7); c.fill(); }
   c.beginPath(); c.ellipse(m.ball.x + 1.5, m.ball.y + 2, BR, BR * .8, 0, 0, 7); c.fill();
   // bolinhas
-  c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '700 11px Rubik, system-ui, sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '700 9px Rubik, system-ui, sans-serif';
   for (const b of m.bodies) {
     const t = m.teams[b.side], ring = b.gk ? t.c1 : t.c2;
     paintKit(c, b.x, b.y, b.r, b.gk ? t.c2 : t.c1, b.gk ? t.c1 : t.c2, b.gk ? '' : t.pt);
-    c.lineWidth = 2.5; c.strokeStyle = ring; c.beginPath(); c.arc(b.x, b.y, b.r - 1.2, 0, 7); c.stroke();
+    c.lineWidth = 1.8; c.strokeStyle = ring; c.beginPath(); c.arc(b.x, b.y, b.r - .9, 0, 7); c.stroke();
     c.lineWidth = 1; c.strokeStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.stroke();
-    c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(b.x - 4, b.y - 4, 3, 0, 7); c.fill();
-    c.lineWidth = 2.6; c.strokeStyle = 'rgba(0,0,0,.8)'; c.strokeText(b.p.num, b.x, b.y + .5);
+    c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(b.x - 3, b.y - 3, 2, 0, 7); c.fill();
+    c.lineWidth = 2; c.strokeStyle = 'rgba(0,0,0,.8)'; c.strokeText(b.p.num, b.x, b.y + .5);
     c.fillStyle = '#fff'; c.fillText(b.p.num, b.x, b.y + .5);
   }
   // bola
