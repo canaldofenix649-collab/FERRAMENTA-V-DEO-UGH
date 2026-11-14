@@ -482,7 +482,18 @@ function drift(m) {
 }
 function setPiece(m, type, side, x, y) {
   const ball = m.ball, d = ad(side);
-  Object.assign(ball, { x: clamp(x, BR, W - BR), y: clamp(y, BR, H - BR), vx: 0, vy: 0 });
+  // trava de segurança: muitas reposições seguidas viram bola ao chão mais para dentro do campo
+  m.rs = m.t - (m.lastRs || -999) < 90 ? (m.rs || 0) + 1 : 0; m.lastRs = m.t;
+  if (m.rs >= 3 && type !== 'penalty') {
+    m.rs = 0; m.drops = (m.drops || 0) + 1;
+    Object.assign(ball, { x: clamp(x, 50, W - 50), y: clamp(y, 60, H - 60), vx: 0, vy: 0 });
+    for (const b of m.bodies) { const dd = dist(b, ball); if (dd < 30) { const k = 30 / (dd || 1); b.x = clamp(ball.x + (b.x - ball.x) * k, PR, W - PR); b.y = clamp(ball.y + (b.y - ball.y) * k, PR, H - PR); } b.vx = b.vy = 0; }
+    m.sp = null; m.freeze = 12; m.lastTouch = null; m.cross = null; m.off = null; m.noTouch = null;
+    say(m, 'O juiz recomeça com bola ao chão.', 'whistle');
+    return;
+  }
+  const inset = type === 'throw' || type === 'corner' ? 7 : BR;
+  Object.assign(ball, { x: clamp(x, inset, W - inset), y: clamp(y, inset, H - inset), vx: 0, vy: 0 });
   const own = m.bodies.filter(b => b.side === side), opp = m.bodies.filter(b => b.side !== side);
   let taker;
   if (type === 'goalkick') taker = own.find(b => b.gk);
@@ -497,9 +508,12 @@ function setPiece(m, type, side, x, y) {
   }
   const tg = type === 'throw' ? { x: W / 2, y: ball.y } : oppGoal(side);
   const ang = Math.atan2(tg.y - ball.y, tg.x - ball.x);
-  taker.x = clamp(ball.x - Math.cos(ang) * (PR + BR + 1), PR, W - PR); taker.y = clamp(ball.y - Math.sin(ang) * (PR + BR + 1), PR, H - PR);
+  // o cobrador fica atrás da bola (pode ficar fora do campo) e não toca nela de novo logo depois de cobrar
+  taker.x = ball.x - Math.cos(ang) * (PR + BR + 1); taker.y = ball.y - Math.sin(ang) * (PR + BR + 1);
+  m.noTouch = { b: taker, until: m.t + (m.freeze || 0) + 40 };
   for (const b of m.bodies) { b.vx = b.vy = 0; }
   m.sp = { type, side, taker }; m.freeze = { penalty: 60, corner: 30, free: 24, goalkick: 22, throw: 16 }[type] || 24; m.cross = null; m.off = null;
+  m.noTouch.until = m.t + m.freeze + 25;
 }
 function expel(m, b) {
   m.bodies.splice(m.bodies.indexOf(b), 1);
@@ -647,7 +661,7 @@ function step(m) {
   const nb = m.bodies.length, off = Math.floor(Math.random() * nb);
   for (let i = 0; i < nb; i++) {
     const b = m.bodies[(i + off) % nb];
-    if (b.cd <= 0 && dist(b, ball) < b.r + ball.r + 3) {
+    if (b.cd <= 0 && !(m.noTouch && m.noTouch.b === b && m.t < m.noTouch.until) && dist(b, ball) < b.r + ball.r + 3) {
       const crossing = m.cross && m.t < m.cross.until;
       if (crossing && b.side === m.cross.side && !b.gk && inBoxOf(ball, 1 - b.side)) { m.cross = null; kick(m, b, 'header'); }
       else { if (crossing) m.cross = null; kick(m, b); }
@@ -668,6 +682,7 @@ function step(m) {
       }
     }
     const b = all[i];
+    if (m.noTouch && m.noTouch.b === b && m.t < m.noTouch.until) continue;
     if (collide(b, ball, .75 - b.p.dri / 300)) {
       const prev = m.lastTouch;
       if (prev && prev.side !== b.side && !b.gk && !prev.gk && dist(prev, ball) < 24 && m.t > m.foulCd) {
