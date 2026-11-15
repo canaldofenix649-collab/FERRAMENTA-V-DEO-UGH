@@ -877,12 +877,27 @@ const FOREIGN = {
         ['Peñarol','PEN','#ffd23f','#111111','v','Campeón del Siglo',40000],['Nacional','NAC','#f8fafc','#1e3a8a','','Gran Parque Central',34000],
         ['Olimpia','OLI','#f8fafc','#111111','b','Manuel Ferreira',22000],['Cerro Porteño','CER','#c8102e','#1e3a8a','v','La Nueva Olla',45000],
         ['LDU Quito','LDU','#f8fafc','#c8102e','','Rodrigo Paz Delgado',41000],['Colo-Colo','COL','#f8fafc','#111111','','Monumental David Arellano',43000],
-        ['Independiente del Valle','IDV','#1e3a8a','#111111','v','Banco Guayaquil',12000],['Bolívar','BLV','#0ea5e9','#f8fafc','','Hernando Siles',41000],['Universidad de Chile','UCH','#1d4ed8','#c8102e','','Nacional',48000]],
+        ['Independiente del Valle','IDV','#1e3a8a','#111111','v','Banco Guayaquil',12000],['Bolívar','BLV','#0ea5e9','#f8fafc','','Hernando Siles',41000],['Universidad de Chile','UCH','#1d4ed8','#c8102e','','Nacional',48000],
+        ['Independiente','IND','#c8102e','#f8fafc','','Libertadores de América',42000],['San Lorenzo','SLO','#1e3a8a','#c8102e','v','Nuevo Gasómetro',47000],
+        ['Talleres','TAL','#1e3a8a','#f8fafc','v','Mario Kempes',57000],['Rosario Central','RCE','#ffd23f','#1e3a8a','v','Gigante de Arroyito',41000],
+        ['Libertad','LIB','#111111','#f8fafc','v','La Huerta',10000],['Atlético Nacional','NAL','#16a34a','#f8fafc','v','Atanasio Girardot',40000],
+        ['Junior','JUN','#c8102e','#f8fafc','v','Metropolitano',46000],['Alianza Lima','ALI','#1e3a8a','#f8fafc','v','Alejandro Villanueva',35000],
+        ['Emelec','EME','#1d4ed8','#111111','h','George Capwell',40000],['Universidad Católica','UCA','#f8fafc','#1d4ed8','b','Claro Arena',20000],
+        ['Caracas','CAR','#7a1631','#f8fafc','','Olímpico de la UCV',24000],['Always Ready','ALR','#c8102e','#f8fafc','','Municipal de El Alto',25000],
+        ['Defensor Sporting','DFS','#7b2cbf','#f8fafc','','Luis Franzini',18000],['Argentinos Juniors','ARJ','#c8102e','#f8fafc','','Diego Maradona',26000]],
   pre: [['The Strongest','STR','#ffd23f','#111111','v','Hernando Siles',41000],['Sporting Cristal','SCR','#0ea5e9','#f8fafc','','Alberto Gallardo',18000]],
   sul: [['Racing','RAC','#0ea5e9','#f8fafc','v','El Cilindro',55000],['Lanús','LAN','#7a1631','#f8fafc','','La Fortaleza',47000],
         ['Vélez Sarsfield','VEL','#f8fafc','#1d4ed8','d','José Amalfitani',49000],['Estudiantes','EST','#c8102e','#f8fafc','v','UNO',32000],
         ['Barcelona SC','BSC','#ffd23f','#111111','','Monumental',57000],['América de Cali','AMC','#c8102e','#f8fafc','','Pascual Guerrero',38000],
-        ['Millonarios','MIL','#1d4ed8','#f8fafc','','El Campín',36000],['Universitario','UNI','#f8fafc','#7a1631','','Monumental U',80000]],
+        ['Millonarios','MIL','#1d4ed8','#f8fafc','','El Campín',36000],['Universitario','UNI','#f8fafc','#7a1631','','Monumental U',80000],
+        ["Newell's Old Boys",'NOB','#c8102e','#111111','v','Marcelo Bielsa',42000],['Huracán','HUR','#f8fafc','#c8102e','','Tomás Ducó',48000],
+        ['Defensa y Justicia','DYJ','#ffd23f','#16a34a','','Norberto Tomaghello',20000],['Belgrano','BEL','#0ea5e9','#f8fafc','','Gigante de Alberdi',32000],
+        ['Godoy Cruz','GOD','#1e3a8a','#f8fafc','v','Malvinas Argentinas',40000],['Tigre','TIG','#1e3a8a','#c8102e','b','José Dellagiovanna',26000],
+        ['Danubio','DAN','#f8fafc','#111111','b','Jardines del Hipódromo',18000],['Liverpool (URU)','LVU','#1e3a8a','#111111','v','Belvedere',10000],
+        ['Guaraní','GUR','#ffd23f','#111111','v','Rogelio Livieres',8000],['Nacional (PAR)','NPA','#f8fafc','#1e3a8a','','Arsenio Erico',4000],
+        ['Palestino','PLT','#16a34a','#c8102e','v','Municipal de La Cisterna',12000],['Cobresal','COB','#f4a261','#f8fafc','','El Cobre',12000],
+        ['Independiente Santa Fe','SFE','#c8102e','#f8fafc','','El Campín',36000],['Deportes Tolima','TOL','#7a1631','#ffd23f','','Manuel Murillo Toro',28000],
+        ['Independiente Medellín','DIM','#c8102e','#1e3a8a','','Atanasio Girardot',40000],['Melgar','MEL','#c8102e','#111111','','Monumental UNSA',40000]],
   mun: [['Real Madrid','RMA','#f8fafc','#ffd23f','','Santiago Bernabéu',83000,88],['Manchester City','MCI','#0ea5e9','#f8fafc','','Etihad Stadium',53000,88],
         ['Al Hilal','HIL','#1d4ed8','#f8fafc','','Kingdom Arena',26000,72],['Al Ahly','AHL','#c8102e','#f8fafc','','Cairo International',75000,70]],
 };
@@ -950,7 +965,8 @@ const LG = ['A', 'B', 'C', 'D'];        // todas as divisões jogadas
 const DIVNAME = { A: 'Série A', B: 'Série B', C: 'Série C', D: 'Série D' };
 const DIVBASE = { A: 74, B: 61, C: 48, D: 40 };
 const NE_STATES = ['BA', 'PE', 'CE', 'AL', 'SE', 'PB', 'MA'], VD_STATES = ['PA', 'AM', 'MT', 'GO'];
-const GROUPS = { lib: 6, sul: 6, ne: 3 };
+const GROUPS = { lib: 6, sul: 6, ne: 3, lib0: 6, sul0: 6 };
+const CONT = ['lib', 'sul', 'lib0', 'sul0'];
 /* clássicos: siglas dos dois times e o nome do jogo */
 const DERBIES = [['FLA','FLU','Fla-Flu'],['FLA','VAS','Clássico dos Milhões'],['FLA','BOT','Clássico da Rivalidade'],['FLU','BOT','Clássico Vovô'],['FLU','VAS','Clássico dos Gigantes'],['BOT','VAS','Clássico da Amizade'],
   ['COR','PAL','Derby Paulista'],['PAL','SAO','Choque-Rei'],['COR','SAO','Majestoso'],['SAN','SAO','San-São'],['SAN','PAL','Clássico da Saudade'],['COR','SAN','Clássico Alvinegro'],
@@ -978,8 +994,10 @@ const CUPS = {
   cdb: { name: 'Copa do Brasil', short: 'Copa do Brasil', after: [1, 3, 6, 8, 12, 14, 20, 22, 30, 32], stages: ['1ª fase', '2ª fase', ...KO2('Oitavas'), ...KO2('Quartas'), ...KO2('Semifinal'), ...KO2('Final')], legs: [1, 1, 'i', 'v', 'i', 'v', 'i', 'v', 'i', 'v'], win: 600, champ: 6000 },
   cdb0: { name: 'Copa do Brasil', short: 'Copa do Brasil', after: [2, 6, 8, 12, 14, 20, 22, 30, 32], stages: ['Primeira fase', ...KO2('Oitavas'), ...KO2('Quartas'), ...KO2('Semifinal'), ...KO2('Final')], legs: [1, 'i', 'v', 'i', 'v', 'i', 'v', 'i', 'v'], win: 600, champ: 6000 },
   pre: { name: 'Pré-Libertadores', short: 'Pré-Liberta', stages: ['Fase 3 · ida', 'Fase 3 · volta'], legs: ['i', 'v'], win: 800, champ: 0 },
-  lib: { name: 'Copa Libertadores', short: 'Libertadores', after: [3, 5, 7, 9, 11, 13, 17, 19, 24, 26, 34], stages: ['Grupos · 1ª', 'Grupos · 2ª', 'Grupos · 3ª', 'Grupos · 4ª', 'Grupos · 5ª', 'Grupos · 6ª', ...KO2('Quartas'), ...KO2('Semifinal'), 'Final'], legs: [0, 0, 0, 0, 0, 0, 'i', 'v', 'i', 'v', 1], win: 1200, champ: 12000 },
-  sul: { name: 'Copa Sul-Americana', short: 'Sul-Americana', after: [4, 6, 8, 10, 12, 14, 18, 20, 25, 27, 35], stages: ['Grupos · 1ª', 'Grupos · 2ª', 'Grupos · 3ª', 'Grupos · 4ª', 'Grupos · 5ª', 'Grupos · 6ª', ...KO2('Quartas'), ...KO2('Semifinal'), 'Final'], legs: [0, 0, 0, 0, 0, 0, 'i', 'v', 'i', 'v', 1], win: 700, champ: 6000 },
+  lib: { name: 'Copa Libertadores', short: 'Libertadores', after: [3, 5, 7, 9, 11, 13, 16, 18, 21, 23, 26, 28, 34], stages: ['Grupos · 1ª', 'Grupos · 2ª', 'Grupos · 3ª', 'Grupos · 4ª', 'Grupos · 5ª', 'Grupos · 6ª', ...KO2('Oitavas'), ...KO2('Quartas'), ...KO2('Semifinal'), 'Final'], legs: [0, 0, 0, 0, 0, 0, 'i', 'v', 'i', 'v', 'i', 'v', 1], win: 1200, champ: 12000 },
+  lib0: { name: 'Copa Libertadores', short: 'Libertadores', after: [3, 5, 7, 9, 11, 13, 17, 19, 24, 26, 34], stages: ['Grupos · 1ª', 'Grupos · 2ª', 'Grupos · 3ª', 'Grupos · 4ª', 'Grupos · 5ª', 'Grupos · 6ª', ...KO2('Quartas'), ...KO2('Semifinal'), 'Final'], legs: [0, 0, 0, 0, 0, 0, 'i', 'v', 'i', 'v', 1], win: 1200, champ: 12000 },
+  sul: { name: 'Copa Sul-Americana', short: 'Sul-Americana', after: [4, 6, 8, 10, 12, 14, 17, 19, 22, 24, 27, 29, 35], stages: ['Grupos · 1ª', 'Grupos · 2ª', 'Grupos · 3ª', 'Grupos · 4ª', 'Grupos · 5ª', 'Grupos · 6ª', ...KO2('Oitavas'), ...KO2('Quartas'), ...KO2('Semifinal'), 'Final'], legs: [0, 0, 0, 0, 0, 0, 'i', 'v', 'i', 'v', 'i', 'v', 1], win: 700, champ: 6000 },
+  sul0: { name: 'Copa Sul-Americana', short: 'Sul-Americana', after: [4, 6, 8, 10, 12, 14, 18, 20, 25, 27, 35], stages: ['Grupos · 1ª', 'Grupos · 2ª', 'Grupos · 3ª', 'Grupos · 4ª', 'Grupos · 5ª', 'Grupos · 6ª', ...KO2('Quartas'), ...KO2('Semifinal'), 'Final'], legs: [0, 0, 0, 0, 0, 0, 'i', 'v', 'i', 'v', 1], win: 700, champ: 6000 },
   mun: { name: 'Mundial de Clubes', short: 'Mundial', stages: ['Semifinal', 'Final'], legs: [1, 1], win: 3000, champ: 20000 },
   ne: { name: 'Copa do Nordeste', short: 'Nordestão', after: [1, 3, 5, 9, 13, 17], stages: ['Grupos · 1ª', 'Grupos · 2ª', 'Grupos · 3ª', 'Quartas de final', 'Semifinal', 'Final'], legs: [0, 0, 0, 1, 1, 1], win: 400, champ: 3000 },
   vd: { name: 'Copa Verde', short: 'Copa Verde', after: [6, 10, 14], stages: ['Quartas de final', 'Semifinal', 'Final'], legs: [1, 1, 1], win: 300, champ: 2000 },
@@ -1105,14 +1123,15 @@ function ensureForeign() {
   }); }
 }
 function setupContinental(c) {
-  const cup = S.cups[c]; if (cup.groups) return;
+  const cup = S.cups[c]; if (!cup || cup.groups) return;
+  const base = c.replace('0', ''), size = c.endsWith('0') ? 16 : 32, ng = size / 4;
   const res = (S.cups.pre && S.cups.pre.results[1]) || [], q = S.qualified;
   const winners = res.map(r => r.w), losers = res.map(r => r.w === r.h ? r.a : r.h);
-  const br = c === 'lib' ? q.lib.concat(winners) : (q.sul || []).concat(losers);
-  const fo = shuffle(S.foreign[c]).slice(0, 16 - br.length), all = shuffle(br).concat(shuffle(fo)), groups = [[], [], [], []];
-  all.forEach((id, i) => groups[i % 4].push(id));
+  const br = base === 'lib' ? q.lib.concat(winners) : (q.sul || []).concat(losers);
+  const fo = shuffle(S.foreign[base]).slice(0, size - br.length), all = shuffle(br).concat(shuffle(fo)), groups = Array.from({ length: ng }, () => []);
+  all.forEach((id, i) => groups[i % ng].push(id));
   cup.teams = all; cup.groups = groups.map(g => shuffle(g));
-  if (c === 'lib') news(`Sorteados os grupos da Libertadores${res.length ? `. Pela pré: ${res.map(r => T(r.w).name).join(' e ')} avançam` : ''}.`, 'Libertadores');
+  if (base === 'lib') news(`Sorteados os ${ng} grupos da Libertadores${res.length ? `. Pela pré: ${res.map(r => T(r.w).name).join(' e ')} avançam` : ''}.`, 'Libertadores');
 }
 const awayAdv = (c, st) => c === 'cdb' && st === 0;
 function ensureD() {
@@ -1185,7 +1204,7 @@ function startSeason() {
   const strong = shuffle(sorted.slice(0, half)), weak = shuffle(sorted.slice(half)), alive0 = [];
   for (let i = 0; i < half; i++) alive0.push(weak[i], strong[i]);
   S.cups.cdb = { id: 'cdb', teams: cdb, alive: alive0, results: [], champion: null };
-  delete S.cups.cdb0;
+  delete S.cups.cdb0; delete S.cups.lib0; delete S.cups.sul0;
   // Libertadores: G-4 e campeão da Copa do Brasil direto; 5º e 6º na pré contra estrangeiros; grupos sorteados depois da pré
   ensureForeign();
   const q = S.qualified; if (!q.pre) { q.pre = q.lib.slice(5, 7); q.lib = q.lib.slice(0, 5); q.sul = (q.sul || []).slice(0, 6); }
@@ -1361,7 +1380,7 @@ const phaseLabel = () => { const p = phase(); return p >= .67 ? 'Em alta' : p <=
 /* ---------- copas: confrontos ---------- */
 const GRP6 = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]], [[1, 0], [3, 2]], [[2, 0], [3, 1]], [[3, 0], [2, 1]]];
 function isGroup(c, st) { return (c === 'est' && st < 7) || (GROUPS[c] && st < GROUPS[c]); }
-function isNeutral(c, st) { return c === 'mun' || c === 'sup' || ((c === 'lib' || c === 'sul') && st === CUPS[c].stages.length - 1); }
+function isNeutral(c, st) { return c === 'mun' || c === 'sup' || (CONT.includes(c) && st === CUPS[c].stages.length - 1); }
 function legOf(c, st) { return CUPS[c].legs[st]; }
 function cupPairs(c, st) {
   const cup = S.cups[c];
@@ -1582,8 +1601,8 @@ function playCupStage(it, ures, info) {
   }
   if (c === 'est' && it.st === 6) { const tb = tableOf(cup.teams, cup.results.slice(0, 7)).map(r => r.id); cup.alive = [tb[0], tb[3], tb[1], tb[2]]; if (!cup.alive.includes('user')) news(`${T('user').name} fica fora das semifinais do ${cup.name}.`, cup.name); }
   if (GROUPS[c] && it.st === GROUPS[c] - 1) {
-    const [A, B, C, D] = cup.groups.map(g => tableOf(g, cup.results.slice(0, GROUPS[c])).map(r => r.id));
-    cup.alive = [A[0], B[1], B[0], A[1], C[0], D[1], D[0], C[1]];
+    const tabs = cup.groups.map(g => tableOf(g, cup.results.slice(0, GROUPS[c])).map(r => r.id));
+    cup.alive = []; for (let k = 0; k + 1 < tabs.length; k += 2) cup.alive.push(tabs[k][0], tabs[k + 1][1], tabs[k + 1][0], tabs[k][1]);
     if (cup.teams.includes('user')) news(cup.alive.includes('user') ? `${T('user').name} se classifica para as quartas da ${cfg.name}.` : `${T('user').name} cai na fase de grupos da ${cfg.name}.`, cfg.short);
   }
 }
@@ -1592,7 +1611,7 @@ function aggregate(cup, st, res) {
   return { h: res.hg + (ida ? ida.ag : 0), a: res.ag + (ida ? ida.hg : 0) };
 }
 function setupMundial() {
-  const champ = S.cups.lib.champion; if (!champ || S.cups.mun.alive) return;
+  const champ = S.cups.lib.champion || (S.cups.lib0 && S.cups.lib0.champion); if (!champ || S.cups.mun.alive) return;
   const eu = pick(S.foreign.mun.slice(0, 2)), other = pick(S.foreign.mun.slice(2));
   S.cups.mun.teams = [champ, other, eu]; S.cups.mun.alive = [champ, other]; S.cups.mun.final = eu;
 }
@@ -1682,7 +1701,7 @@ function awards() {
   return { craque: nm(craque), art: nm(art), rev: nm(rev), sel: sel.map(nm) };
 }
 function endSeason() {
-  if (S.cups.cdb0 && S.cups.cdb0.champion && !S.cups.cdb.champion) S.cups.cdb.champion = S.cups.cdb0.champion;
+  for (const c of ['cdb', 'lib', 'sul']) if (S.cups[c + '0'] && S.cups[c + '0'].champion && !S.cups[c].champion) S.cups[c].champion = S.cups[c + '0'].champion;
   S.awards = awards();
   const a = S.awards;
   news(`Prêmios da temporada: craque ${a.craque.name} (${a.craque.abbr}), artilheiro ${a.art.name} com ${a.art.g} gols, revelação ${a.rev ? a.rev.name : '—'}.`, 'Prêmios');
@@ -1795,7 +1814,7 @@ function takeOver(id) {
 /* =====================================================================
    SALVAR
    ===================================================================== */
-try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); } } catch (e) { S = null; }
+try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); } } catch (e) { S = null; }
 const save = () => { if (!S) return; S.pid = PID; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 /* =====================================================================
@@ -2127,12 +2146,12 @@ function gamesView() {
   <div class="card"><span class="label">Seus resultados</span><div class="results">${S.log.slice().reverse().map(l => `<div class="muted" style="font-size:12px;padding-top:8px">${esc(l.label)}</div>${resultRow(l)}`).join('') || '<span class="muted">Nenhum jogo disputado nesta temporada.</span>'}</div></div>`;
 }
 function cupsView() {
-  const c = sub.cup === 'cdb' && S.cups.cdb0 ? 'cdb0' : sub.cup, cfg = CUPS[c], cup = S.cups[c] || { teams: [], results: [], alive: null };
+  const c = ['cdb', 'lib', 'sul'].includes(sub.cup) && S.cups[sub.cup + '0'] ? sub.cup + '0' : sub.cup, cfg = CUPS[c], cup = S.cups[c] || { teams: [], results: [], alive: null };
   const status = !cup.teams.includes('user') ? 'Seu clube não disputa esta competição nesta temporada.' : cup.champion === 'user' ? 'Campeão!' : inCup(c) ? 'Seu clube está vivo na competição.' : 'Seu clube foi eliminado.';
   let body = '';
   if (c === 'est') body += `<div class="card"><span class="label">Fase de classificação · 4 primeiros vão à semifinal</span>${miniTable(tableOf(cup.teams, cup.results.slice(0, 7)), 4, '')}</div>`;
   if (GROUPS[c] && !cup.groups) body += `<div class="card muted">${c === 'lib' ? 'Os grupos são sorteados depois da Pré-Libertadores.' : 'Os grupos são sorteados depois da Pré-Libertadores (os eliminados dela vêm para cá).'}</div>`;
-  if (GROUPS[c] && cup.groups) body += `<div class="card"><span class="label">Fase de grupos${GROUPS[c] === 6 ? ' (ida e volta)' : ''}</span><div class="grp">${cup.groups.map((g, gi) => miniTable(tableOf(g, cup.results.slice(0, GROUPS[c])), 2, `Grupo ${'ABCD'[gi]}`)).join('')}</div></div>`;
+  if (GROUPS[c] && cup.groups) body += `<div class="card"><span class="label">Fase de grupos${GROUPS[c] === 6 ? ' (ida e volta)' : ''}</span><div class="grp">${cup.groups.map((g, gi) => miniTable(tableOf(g, cup.results.slice(0, GROUPS[c])), 2, `Grupo ${'ABCDEFGH'[gi]}`)).join('')}</div></div>`;
   if (c === 'mun' && !cup.teams.length) body += `<div class="card muted">O Mundial é disputado no fim da temporada pelo campeão da Libertadores.</div>`;
   for (let st = cfg.stages.length - 1; st >= 0; st--) {
     if (isGroup(c, st)) continue;
@@ -2652,7 +2671,7 @@ function advanceAuto() {
     const it = S.cal[S.ci];
     if (it.k === 'liga') ensureCFinal(it.r);
     if (it.k === 'cup' && it.c === 'mun' && it.st === 0) setupMundial();
-    if (it.k === 'cup' && (it.c === 'lib' || it.c === 'sul')) setupContinental(it.c);
+    if (it.k === 'cup' && CONT.includes(it.c)) setupContinental(it.c);
     if (involvesUser(it)) break;
     processItem(it, null); S.ci++;
   }
@@ -2750,9 +2769,18 @@ function makePreview() {
   if (ts && gols(ts)) parts.push(`${ts.name} é o artilheiro do time na temporada, com ${gols(ts)} gol${gols(ts) > 1 ? 's' : ''}.`);
   if (os) parts.push(`No ${op.name}, a atenção é para ${os.name}.`);
   parts.push(`A partida é ${where}, ${mi.when.toLowerCase()}, com arbitragem de ${mi.ref}.`);
+  let imp = !!dby;
+  if (it.k === 'liga') {
+    if (d === 'C' && it.r >= 19) imp = true;
+    const st = stakes('user', d), so = stakes(op.id, d);
+    if (st && !st.early) imp = imp || st.done || st.k === 'zona' || (st.k === 'perigo' && st.R <= 12) || (st.t === 'lider' && st.R <= 12) || st.t === 'titulo' || (st.v === 'busca' && st.R <= 12) || (st.v === 'dentro' && st.R <= 6) || !!(so && so.k && st.k);
+  } else if (it.k === 'cup') {
+    const lg = legOf(it.c, it.st), stg = CUPS[it.c].stages[it.st];
+    imp = imp || lg === 'v' || lg === 1 || /Final/.test(stg) || (isGroup(it.c, it.st) && it.st === (it.c === 'est' ? 6 : GROUPS[it.c] - 1));
+  }
+  if (!imp) S.preview = null;
   const body = parts.join(' ');
-  news(head + '.', 'Prévia', 'user', body);
-  S.preview = { key: S.previewCi, head: fem(head), body: fem(body) };
+  if (imp) { news(head + '.', 'Prévia', 'user', body); S.preview = { key: S.previewCi, head: fem(head), body: fem(body) }; }
   // jogo da rodada na Série A
   if (it.k === 'liga' && (S.fixtures.A[it.r] || []).length) {
     let best = null, bs = 0;
@@ -2762,7 +2790,7 @@ function makePreview() {
       const score = (sh.pos <= 3 && sa.pos <= 3 ? 5 : 0) + ((sh.k && sa.k && sh.k !== 'perigo' || sa.k === 'zona' && sh.k) ? 4 : 0) + (derbyName(T(h), T(a)) ? 3 : 0) + (sh.R <= 6 ? 1 : 0);
       if (score > bs) { bs = score; best = [h, a, sh, sa]; }
     }
-    if (best && bs >= 3 && !best[2].early) {
+    if (best && bs >= 4 && !best[2].early && best[2].R <= 15) {
       const [h, a, sh, sa] = best, dn = derbyName(T(h), T(a));
       const hd = sh.pos <= 3 && sa.pos <= 3 ? `Jogo da rodada: ${T(h).name} e ${T(a).name} duelam na parte de cima da tabela` : (sh.k && sa.k) ? `Jogo de seis pontos: ${T(h).name} e ${T(a).name} brigam para fugir da queda` : `Jogo da rodada: ${dn} movimenta a Série A`;
       news(hd + '.', 'Prévia', h, `O ${T(h).name} (${sh.pos}º, ${ptsT(sh.pts)}) recebe o ${T(a).name} (${sa.pos}º, ${ptsT(sa.pts)})${dn ? ` no ${dn}` : ''}. ${sh.R <= 6 ? `Faltando ${sh.R} rodada${sh.R === 1 ? '' : 's'}, um tropeço pode custar a temporada.` : 'Um resultado positivo muda o cenário na tabela.'}`);
