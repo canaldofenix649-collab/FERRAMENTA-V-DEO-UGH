@@ -385,6 +385,8 @@ const pOvr = p => { const w = POSW[p.pos] || POSW.MEI; let s = 0; for (const k i
    ===================================================================== */
 const W = 340, H = 540, GW = 88, PR = 9, BR = 5, FRAMES = 3600, DT = 1 / 60, SC = 1.12;
 const BOX_W = 200, BOX_D = 80, PEN_D = 54;
+const RUNW = { LAT: 1.15, PON: 1.18, MEI: 1.1, VOL: 1.05, CA: 1, ZAG: .85 };
+let STA_K = .025;
 let FOUL_P = .2, DEFLECT = .6, SHOT_D = 170, OFF_T = -8;
 const D4 = [[.14,.80],[.38,.84],[.62,.84],[.86,.80]];
 const FORM = {
@@ -654,7 +656,7 @@ function substitute(m, out, inP) {
 function autoSubs(m, s, n) {
   const sd = m.side[s];
   for (let k = 0; k < n && sd.subs < 5; k++) {
-    const out = m.bodies.filter(b => b.side === s && !b.gk && b.sta < 78).sort((a, b) => a.sta - b.sta)[0];
+    const out = m.bodies.filter(b => b.side === s && !b.gk && b.sta < 65).sort((a, b) => a.sta - b.sta)[0];
     if (!out) return;
     const want = slotPos(formOf(sd.team), out.idx);
     const inP = sd.bench.filter(p => p.pos !== 'GOL').sort((a, b) => pOvr(b) * posFit(b.pos, want) - pOvr(a) * posFit(a.pos, want))[0];
@@ -683,7 +685,7 @@ function goal(m, s) {
 function step(m) {
   if (m.over) return;
   m.t++;
-  if (m.t === FRAMES / 2) { kickoff(m); say(m, 'Fim do primeiro tempo.', 'whistle'); m.onHalf && m.onHalf(); }
+  if (m.t === FRAMES / 2) { for (const b of m.bodies) b.sta = Math.min(100, b.sta + 8); kickoff(m); say(m, 'Fim do primeiro tempo.', 'whistle'); m.onHalf && m.onHalf(); }
   if (m.t >= FRAMES) { m.over = true; say(m, 'Fim de jogo!', 'whistle'); m.onWhistle && m.onWhistle('end'); return; }
   if (m.t % 300 === 0) for (const s of m.ai) {
     const diff = m.score[s] - m.score[1 - s], min = m.t / 40;
@@ -732,12 +734,12 @@ function step(m) {
       tx = clamp(tx, PR, W - PR); ty = clamp(ty, PR + 10, H - PR - 10);
     }
     const dx = tx - b.x, dy = ty - b.y, dl = Math.hypot(dx, dy) || 1;
-    const spd = b.base * m.side[s].fac * (.82 + .18 * b.sta / 100) * boost;
+    const spd = b.base * m.side[s].fac * (.7 + .3 * b.sta / 100) * boost;
     const sp = spd * Math.min(1, dl / 14), k = Math.min(1, DT * 7);
     b.vx += (dx / dl * sp - b.vx) * k; b.vy += (dy / dl * sp - b.vy) * k;
     b.x += b.vx * DT; b.y += b.vy * DT; b.cd -= DT; b.saveCd -= DT;
     const fis = m.side[s].fis, run = Math.min(1, Math.hypot(b.vx, b.vy) / (b.base || 1));
-    b.sta = Math.max(0, b.sta - .0075 * m.side[s].drain * (.5 + .5 * run) * (1.15 - .06 * fis) * (b.p.age > 30 ? 1.12 : 1) * (b.gk ? .3 : 1));
+    b.sta = Math.max(0, b.sta - STA_K * m.side[s].drain * (.45 + .55 * run) * (1.15 - .06 * fis) * (b.p.age > 30 ? 1.15 : b.p.age < 23 ? .92 : 1) * (b.gk ? .15 : RUNW[slotPos(formOf(m.teams[s]), b.idx)] || 1));
   }
   // impedimento marcado pelo bandeira
   if (m.off && m.t >= m.off.t) {
@@ -2768,7 +2770,7 @@ function renderSubs() {
   p.dataset.k = 'subs';
   p.innerHTML = `<div class="card"><div class="round-h"><span class="label">Substituições · ${sd.subs}/5</span><button class="btn small" data-mp="close">Voltar</button></div>
     <span class="muted" style="font-size:12px">${subSel ? 'Agora escolha quem entra.' : 'Escolha quem sai. A barra mostra o fôlego.'}</span>
-    ${on.map(b => `<button class="subrow" data-mp="out" data-id="${b.p.id}" aria-pressed="${subSel === b.p.id}"><span><b>${b.p.num} ${esc(b.p.name)}</b> <span class="pos-tag">${b.p.pos}</span>${b.yc ? ' <span class="tag gold">amarelo</span>' : ''}</span><span>${meter(b.sta, b.sta > 70 ? 'var(--good)' : b.sta > 45 ? 'var(--amber)' : 'var(--bad)')}</span></button>`).join('')}
+    ${on.map(b => `<button class="subrow" data-mp="out" data-id="${b.p.id}" aria-pressed="${subSel === b.p.id}"><span><b>${b.p.num} ${esc(b.p.name)}</b> <span class="pos-tag">${b.p.pos}</span>${b.yc ? ' <span class="tag gold">amarelo</span>' : ''}</span><span>${meter(b.sta, b.sta > 65 ? 'var(--good)' : b.sta > 40 ? 'var(--amber)' : 'var(--bad)')}<span style="font-size:11px;color:var(--muted)">${Math.round(b.sta)}%</span></span></button>`).join('')}
     ${subSel ? `<span class="label">Banco</span>${sd.bench.map(q => `<button class="subrow" data-mp="in" data-id="${q.id}"><span><b>${q.num} ${esc(q.name)}</b> <span class="pos-tag">${q.pos}</span></span><span class="ov">${pOvr(q)}</span></button>`).join('') || '<span class="muted">Sem reservas disponíveis.</span>'}` : ''}
     ${sd.subs >= 5 ? '<span class="muted">Você já fez as 5 substituições.</span>' : ''}
   </div>`;
@@ -3014,7 +3016,7 @@ $('help').addEventListener('click', () => { if (!S || S.fired) return; tab = 'ho
 /* instalar como aplicativo (funciona quando o jogo é hospedado com o manifest e o service worker da pasta) */
 try { if (location.protocol === 'https:' && !/claude/.test(location.hostname)) { const l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.webmanifest'; document.head.appendChild(l); if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {}); } } catch (e) {}
 
-window.__liga = { runMatch, makeSquad, makeTeam, createMatch, step, get S() { return S; } };
+window.__liga = { setSta: k => { STA_K = k; }, runMatch, makeSquad, makeTeam, createMatch, step, get S() { return S; } };
 if (S && !S.fired) { advanceAuto(); save(); }
 render();
 })();
