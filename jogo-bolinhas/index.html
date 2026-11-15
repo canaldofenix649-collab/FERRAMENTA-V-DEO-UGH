@@ -460,12 +460,17 @@ function kitsOf(t) {
   return [{ c1: t.c1, c2: t.c2, pt: t.pt, n: 1 }, { c1: t.c2, c2: t.c1, pt: t.pt, n: 2 }, { c1: lum(t.c1) > 140 ? '#111111' : '#f8fafc', c2: t.c1, pt: '', n: 3 }];
 }
 function colorGap(a, b) { const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16); return Math.hypot((x >> 16) - (y >> 16), ((x >> 8) & 255) - ((y >> 8) & 255), (x & 255) - (y & 255)); }
+const kitOk = (k, o) => colorGap(k.c1, o.c1) > 110 && colorGap(k.c1, o.c2) > 60;
 function pickKits(tA, tB, home) {
-  const keep = home === 1 ? 1 : 0, other = 1 - keep, ka = kitsOf([tA, tB][keep])[0], list = kitsOf([tA, tB][other]);
-  const ok = k => colorGap(k.c1, ka.c1) > 110 && colorGap(k.c1, ka.c2) > 60;
-  const chosen = list.find(ok) || list[2];
-  const out = []; out[keep] = ka; out[other] = chosen; return out;
+  const ts = [tA, tB], ks = ts.map(kitsOf), want = ts.map(t => t.tac && t.tac.kit != null && t.tac.kit !== '' ? +t.tac.kit : null);
+  const keep = want[1] != null && want[0] == null ? 1 : want[0] != null ? 0 : (home === 1 ? 1 : 0), other = 1 - keep;
+  const out = []; out[keep] = ks[keep][want[keep] ?? 0];
+  out[other] = want[other] != null && kitOk(ks[other][want[other]], out[keep]) ? ks[other][want[other]] : (ks[other].find(k => kitOk(k, out[keep])) || ks[other][2]);
+  return out;
 }
+const kitBg = k => ({ v: `repeating-linear-gradient(90deg,${k.c1} 0 5px,${k.c2} 5px 10px)`, h: `repeating-linear-gradient(0deg,${k.c1} 0 5px,${k.c2} 5px 10px)`,
+  b: `linear-gradient(180deg,${k.c1} 0 38%,${k.c2} 38% 62%,${k.c1} 62%)`, d: `linear-gradient(135deg,${k.c1} 0 40%,${k.c2} 40% 60%,${k.c1} 60%)` }[k.pt] || k.c1);
+const kitBall = (k, sz = 44) => `<span style="display:inline-block;width:${sz}px;height:${sz}px;border-radius:50%;background:${kitBg(k)};border:3px solid ${k.c2};box-shadow:0 2px 4px rgba(0,0,0,.4)"></span>`;
 function makeBody(m, s, i, p, f) {
   const fit = posFit(p.pos, slotPos(f, i));
   return { side: s, idx: i, gk: i === 0, p, r: PR, m: 1 + p.def / 90, x: 0, y: 0, vx: 0, vy: 0, cd: 0, sta: 100, saveCd: 0,
@@ -2029,8 +2034,8 @@ function matchInfo(ev) {
   return { ref, when, rnd, pitch: pitchOf(ev.neutral ? null : host), crowd: Math.round(Math.min(host.stadium.cap, host.stadium.cap * fill) / 100) * 100 };
 }
 /* ---------- preleção: escalação e tática antes do jogo ---------- */
-let pmSel = null, preMode = false;
-const TAC_DEF = { ment: 0, press: 'normal', style: 'equil', pk: null, fk: null, ck: null, cap: null };
+let pmSel = null, preMode = false, crestMsg = '';
+const TAC_DEF = { ment: 0, press: 'normal', style: 'equil', pk: null, fk: null, ck: null, cap: null, kit: null };
 const tacOf = () => { const u = T('user'); u.tac = Object.assign({}, TAC_DEF, u.tac || {}); return u.tac; };
 function autoXI() {
   const u = T('user'), f = formOf(u), pool = u.players.slice(), xi = [];
@@ -2078,6 +2083,12 @@ function preView() {
     <span class="muted" style="font-size:12px">Marcação</span>${segT('press', tac.press, [['recuada', 'Recuada'], ['normal', 'Normal'], ['alta', 'Pressão alta']])}
     <span class="muted" style="font-size:12px">Estilo de jogo</span>${segT('style', tac.style, [['equil', 'Equilibrado'], ['posse', 'Toque de bola'], ['contra', 'Contra-ataque'], ['cruz', 'Cruzamentos']]).replace('class="seg"', 'class="seg wrap"')}
     <span class="muted" style="font-size:12px">${{ recuada: 'Recuada: time mais atrás, cansa menos.', normal: 'Normal: marcação padrão.', alta: 'Pressão alta: mais velocidade e roubadas no campo de ataque, mas cansa 20% mais.' }[tac.press]} ${{ equil: '', posse: 'Toque de bola: mais passes e menos chutes de longe.', contra: 'Contra-ataque: lançamentos em profundidade para os atacantes.', cruz: 'Cruzamentos: pontas e laterais levantam mais bolas na área.' }[tac.style]}</span></div>
+  ${(() => { const ks = kitsOf(u), opK = kitsOf(op)[0], cur = tac.kit == null ? null : +tac.kit, pre = pickKits(u, op, ev.home === 'user' ? 0 : 1), mine = pre[0], theirs = pre[1];
+    return `<div class="card"><span class="label">Uniforme</span><div class="tiles" style="grid-template-columns:repeat(4,1fr)">
+      <button class="tile" data-act="kit" data-v="" aria-pressed="${cur == null}" style="${cur == null ? 'border-color:var(--amber)' : ''}">${kitBall(ev.home === 'user' || kitOk(ks[0], opK) ? ks[0] : (ks.find(k => kitOk(k, opK)) || ks[2]), 36)}<span>Automático</span></button>
+      ${ks.map((k, i) => `<button class="tile" data-act="kit" data-v="${i}" style="${cur === i ? 'border-color:var(--amber)' : ''}">${kitBall(k, 36)}<span>Uniforme ${i + 1}${!kitOk(k, opK) ? ' ⚠' : ''}</span></button>`).join('')}</div>
+      <div class="row" style="justify-content:center;gap:14px">${kitBall(mine)}<span class="muted">×</span>${kitBall(theirs)}</div>
+      <span class="muted" style="font-size:12px;text-align:center">${esc(u.name)} de uniforme ${mine.n} · ${esc(op.name)} de uniforme ${theirs.n}${cur != null && !kitOk(ks[cur], opK) ? '. As cores se parecem com as do adversário, então ele joga de reserva.' : ''}</span></div>`; })()}
   <div class="card"><span class="label">Funções</span><div class="pm-roles">
     <label>Capitão${opt('cap', tac.cap)}</label><label>Pênaltis${opt('pk', tac.pk)}</label><label>Faltas${opt('fk', tac.fk)}</label><label>Escanteios${opt('ck', tac.ck)}</label></div></div>
   ${ctxTable(ev)}
@@ -2197,6 +2208,9 @@ function tableView() {
   const d = viewDiv || userDiv(), tbl = standings(d), n = tbl.length;
   const cg = d === 'C' ? cGroupTables() : null;
   return `${editId ? editCard() : ''}
+  <div class="card"><div class="round-h"><span class="label">Escudos</span><label class="btn small file-btn">Importar escudos<input type="file" accept="image/*" multiple id="crests-in"></label></div>
+    <span class="muted" style="font-size:12px">Escolha várias imagens de uma vez com o nome do clube no arquivo (ex.: flamengo.png, sao paulo.png ou FLA.png). Ficam salvas só neste aparelho.${crestMsg ? ` <b style="color:var(--amber)">${esc(crestMsg)}</b>` : ''}</span>
+    ${Object.values(S.teams).some(t => t.logo) ? '<button class="btn small" data-act="nologos">Remover todos os escudos importados</button>' : ''}</div>
   ${seg('div', d, LG.filter(x => (S.divisions[x] || []).length).map(x => [x, DIVNAME[x]]))}
   ${cg ? `<div class="card"><span class="label">Quadrangulares finais · 2 primeiros de cada grupo sobem</span><div class="grp">${cg.map((g, i) => miniTable(g, 2, `Grupo ${i + 1}`)).join('')}</div>${(S.results.C[25] || []).length ? `<div class="results">${S.results.C.slice(25, 27).filter(Boolean).flat().map(resultRow).join('')}</div>` : ''}</div>` : ''}
   <div class="card" style="padding:12px 10px">
@@ -2602,6 +2616,7 @@ document.addEventListener('click', e => {
   else if (a === 'ecolor') { readEdit(); T(editId)[b.dataset.k] = b.dataset.c; save(); render(true); }
   else if (a === 'ept') { readEdit(); T(editId).pt = v; save(); render(true); }
   else if (a === 'nophoto') { delete T(b.dataset.id).stadium.photo; save(); render(true); }
+  else if (a === 'nologos') { for (const tm of Object.values(S.teams)) delete tm.logo; crestMsg = 'Escudos removidos.'; save(); render(true); }
   else if (a === 'nologo') { delete T(editId).logo; save(); render(true); }
   else if (a === 'esave') { readEdit(); save(); editId = null; render(); }
   else if (a === 'eclose') { editId = null; render(); }
@@ -2709,6 +2724,7 @@ document.addEventListener('click', e => {
   else if (a === 'pmplay') { preMode = false; pmSel = null; save(); openMatch(); }
   else if (a === 'pmquick') { preMode = false; pmSel = null; save(); quickMatch(); }
   else if (a === 'autoxi') { autoXI(); pmSel = null; save(); render(true); }
+  else if (a === 'kit') { tacOf().kit = v === '' ? null : +v; save(); render(true); }
   else if (a === 'tacseg') { const tc = tacOf(), k = b.dataset.k; tc[k] = k === 'ment' ? +v : v; save(); render(true); }
   else if (a === 'pm') { const u = T('user'); if (pmSel == null) pmSel = i; else if (pmSel === i) pmSel = null; else { [u.players[pmSel], u.players[i]] = [u.players[i], u.players[pmSel]]; pmSel = null; save(); } render(true); }
   else if (a === 'quick') quickMatch();
@@ -2721,6 +2737,17 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target, a = t.dataset.act;
+  if (t.id === 'crests-in' && t.files && t.files.length) {
+    const norm = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[^a-z0-9]/g, '');
+    const teams = Object.values(S.teams), files = [...t.files]; let ok = 0, miss = [];
+    const findT = f => { const k = norm(f.name); return teams.find(x => norm(x.name) === k) || teams.find(x => x.abbr.toLowerCase() === k) || (k.length >= 4 && teams.find(x => norm(x.name).startsWith(k))); };
+    let left = files.length;
+    files.forEach(f => { const tm = findT(f); if (!tm) { miss.push(f.name); if (--left === 0) { crestMsg = `${ok} escudo${ok === 1 ? '' : 's'} importado${ok === 1 ? '' : 's'}${miss.length ? `; sem clube para: ${miss.slice(0, 5).join(', ')}` : ''}.`; save(); render(true); } return; }
+      const fr = new FileReader(); fr.onload = () => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d'), sc = Math.min(96 / img.width, 96 / img.height); x.drawImage(img, (96 - img.width * sc) / 2, (96 - img.height * sc) / 2, img.width * sc, img.height * sc); tm.logo = c.toDataURL('image/png'); ok++;
+        if (--left === 0) { crestMsg = `${ok} escudo${ok === 1 ? '' : 's'} importado${ok === 1 ? '' : 's'}${miss.length ? `; sem clube para: ${miss.slice(0, 5).join(', ')}` : ''}.`; save(); render(true); } };
+        img.onerror = () => { miss.push(f.name); if (--left === 0) { crestMsg = `${ok} escudos importados.`; save(); render(true); } }; img.src = fr.result; }; fr.readAsDataURL(f); });
+    return;
+  }
   if (t.classList && t.classList.contains('stad-in') && t.files && t.files[0]) {
     const tid = t.dataset.id, fr = new FileReader();
     fr.onload = () => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'), w = 640, h = Math.round(640 * 9 / 16); c.width = w; c.height = h; const x = c.getContext('2d'), sc = Math.max(w / img.width, h / img.height); x.drawImage(img, (w - img.width * sc) / 2, (h - img.height * sc) / 2, img.width * sc, img.height * sc); T(tid).stadium.photo = c.toDataURL('image/jpeg', .6); save(); render(true); }; img.src = fr.result; };
