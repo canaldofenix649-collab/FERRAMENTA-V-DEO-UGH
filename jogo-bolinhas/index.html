@@ -1394,6 +1394,7 @@ function curLabel() {
   const it = S.cal[Math.min(S.ci, S.cal.length - 1)];
   return it ? itemShort(it) : 'Pré-temporada';
 }
+const daCup = c => (c === 'est' ? 'do ' : 'da ') + cupName(c), naCup = c => (c === 'est' ? 'no ' : 'na ') + cupName(c);
 function cupName(c) { return c === 'est' ? S.cups.est.name : CUPS[c].name; }
 function itemShort(it) { return it.k === 'liga' ? `Rodada ${it.r + 1}` : it.k === 'fifa' ? 'Data FIFA' : `${c2s(it.c)} · ${CUPS[it.c].stages[it.st]}`; }
 const c2s = c => c === 'est' ? S.cups.est.name : CUPS[c].short;
@@ -1606,7 +1607,7 @@ function playCupStage(it, ures, info) {
     list.push(res);
   }
   cup.results[it.st] = list;
-  if ((leg === 1 || leg === 'v') && c !== 'est') { const z = list.filter(r => r.h !== 'user' && r.a !== 'user' && ovr(T(r.h === r.w ? r.a : r.h)) - ovr(T(r.w)) >= 8)[0]; if (z) news(`Zebra na ${cupName(c)}: ${T(z.w).name} elimina o ${T(z.h === z.w ? z.a : z.h).name}.`, 'Copas', z.w); }
+  if ((leg === 1 || leg === 'v') && c !== 'est') { const z = list.filter(r => r.h !== 'user' && r.a !== 'user' && ovr(T(r.h === r.w ? r.a : r.h)) - ovr(T(r.w)) >= 8)[0]; if (z) news(`Zebra ${naCup(c)}: ${T(z.w).name} elimina o ${T(z.h === z.w ? z.a : z.h).name}.`, 'Copas', z.w); }
   const mine = list.find(x => x.h === 'user' || x.a === 'user');
   if (mine && mine.h === 'user' && !neutral) info.gate = gate(true, mine.a);
   if (mine) {
@@ -1620,12 +1621,12 @@ function playCupStage(it, ures, info) {
     if (c === 'mun' && it.st === 0) cup.alive.push(cup.final);
     if (mine) {
       const winP = c === 'cdb' && it.st < 2 ? 250 : cfg.win;
-      if (mine.w === 'user') { info.prize += winP; addMoney(winP, 'Premiações'); if (cup.alive.length > 1) news(`${T('user').name} avança na ${cupName(c)}!`, c2s(c)); }
-      else news(`${T('user').name} é eliminado da ${cupName(c)} (${cfg.stages[it.st]})${c === 'pre' ? ' e vai disputar a Sul-Americana' : ''}.`, c2s(c));
+      if (mine.w === 'user') { info.prize += winP; addMoney(winP, 'Premiações'); if (cup.alive.length > 1) news(`${T('user').name} avança ${naCup(c)}!`, c2s(c)); }
+      else news(`${T('user').name} é eliminado ${daCup(c)} (${cfg.stages[it.st]})${c === 'pre' ? ' e vai disputar a Sul-Americana' : ''}.`, c2s(c));
     }
     if (cup.alive.length === 1 && c !== 'pre') {
       cup.champion = cup.alive[0];
-      news(`${T(cup.champion).name} é campeão da ${cupName(c)} ${S.season}!`, 'Campeão');
+      news(`${T(cup.champion).name} é campeão ${daCup(c)} ${S.season}!`, 'Campeão');
       for (const p of T(cup.champion).players) HI(p).tit.push(`${cupName(c)} ${S.season}`);
       if (cup.champion === 'user') { addMoney(cfg.champ, 'Premiações'); info.prize += cfg.champ; S.titles.push(`${cupName(c)} ${S.season}`); S.board.conf = clamp(S.board.conf + 15, 0, 100); S.fans = clamp(S.fans + 15, 0, 100); makeCover(`É CAMPEÃO!`, `${T('user').name} conquista a ${cupName(c)} ${S.season}`, 'user'); }
     }
@@ -1981,6 +1982,8 @@ function homeView() {
     <div class="btns"><button class="btn primary" data-act="play" ${locked ? 'disabled' : ''}>Jogar partida</button><button class="btn" data-act="quick" ${locked ? 'disabled' : ''}>Simular</button></div>
     ${locked ? '<span class="muted" style="font-size:12px;text-align:center">Escolha o foco da pré-temporada acima para começar.</span>' : ''}
   </div>
+  ${ctxTable(ev)}
+  ${lastGameCard()}
   ${tilesCard()}
   ${euro}
   ${S.election && !S.election.seen ? `<div class="card alert"><span class="label">Eleição no clube</span><div>${esc(S.election.text)}</div><button class="btn small" data-act="elok">Entendi</button></div>` : ''}
@@ -2077,6 +2080,8 @@ function preView() {
     <span class="muted" style="font-size:12px">${{ recuada: 'Recuada: time mais atrás, cansa menos.', normal: 'Normal: marcação padrão.', alta: 'Pressão alta: mais velocidade e roubadas no campo de ataque, mas cansa 20% mais.' }[tac.press]} ${{ equil: '', posse: 'Toque de bola: mais passes e menos chutes de longe.', contra: 'Contra-ataque: lançamentos em profundidade para os atacantes.', cruz: 'Cruzamentos: pontas e laterais levantam mais bolas na área.' }[tac.style]}</span></div>
   <div class="card"><span class="label">Funções</span><div class="pm-roles">
     <label>Capitão${opt('cap', tac.cap)}</label><label>Pênaltis${opt('pk', tac.pk)}</label><label>Faltas${opt('fk', tac.fk)}</label><label>Escanteios${opt('ck', tac.ck)}</label></div></div>
+  ${ctxTable(ev)}
+  ${lastGameCard()}
   <div class="card"><span class="label">Análise do adversário · ${esc(op.name)}</span>
     <div class="kv"><span class="muted">Formação</span><span>${formOf(op)} · força ${ovr(op)}</span></div>
     <div class="kv"><span class="muted">Gramado</span><span>${(() => { const pc = pitchOf(ev.neutral ? null : T(ev.home)); return `${pc.n} (${pc.dims})${pc.k > 1 ? ` · cansa ${Math.round((pc.k - 1) * 100)}% mais` : pc.k < 1 ? ` · cansa ${Math.round((1 - pc.k) * 100)}% menos` : ""}`; })()}</span></div>
@@ -2084,6 +2089,45 @@ function preView() {
     <div class="kv"><span class="muted">Destaques</span><span style="text-align:right">${sc.stars.map(p => `${esc(p.name)} (${p.pos}, ${pOvr(p)})`).join(', ')}</span></div>
     <div class="muted" style="font-size:13px"><b style="color:var(--amber)">Auxiliar:</b> ${esc(tip(u, op, ev))}</div></div>
   <div class="btns" style="position:sticky;bottom:0;background:var(--night);padding:8px 0"><button class="btn primary" data-act="pmplay">Ir para o jogo</button><button class="btn" data-act="pmquick">Simular</button></div>`;
+}
+/* ---------- classificação da competição do próximo jogo e último resultado ---------- */
+function ctxTable(ev) {
+  const it = ev.it, d = userDiv();
+  const row = (r, i, cls) => { const t = T(r.id); return `<tr class="${cls} ${r.id === 'user' ? 'me' : ''}"><td class="pos">${i + 1}</td><td><span class="tn">${badge(t)}<span>${esc(t.name)}</span></span></td><td class="pts">${r.pts}</td><td>${r.j}</td><td>${(r.sg ?? (r.gp - r.gc)) > 0 ? '+' : ''}${r.sg ?? (r.gp - r.gc)}</td></tr>`; };
+  const head = '<thead><tr><th style="text-align:center">#</th><th>Time</th><th>P</th><th>J</th><th>SG</th></tr></thead>';
+  const goto = (lab, v) => `<button class="btn small" data-act="go" data-t="comp" data-k="comp" data-v="${v}">${lab}</button>`;
+  if (it.k === 'liga' && !(d === 'C' && it.r >= 19)) {
+    const tbl = standings(d), n = tbl.length, me = tbl.findIndex(r => r.id === 'user');
+    const zone = i => d === 'A' ? (i < 4 ? 'up' : i < 6 ? 'pre' : i < 12 ? 'sa' : i >= n - 4 ? 'down' : '') : (i < (d === 'C' ? 8 : 4) ? 'up' : d !== 'D' && (d !== 'C' || (S.divisions.D || []).length) && i >= n - 4 ? 'down' : '');
+    const show = new Set([0, 1, 2]); for (let k = me - 2; k <= me + 2; k++) if (k >= 0 && k < n) show.add(k); for (let k = n - 4; k < n; k++) if (d !== 'D') show.add(k);
+    let prev = -1, rows = '';
+    [...show].sort((a, b) => a - b).forEach(i => { if (prev >= 0 && i > prev + 1) rows += '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:2px">⋯</td></tr>'; rows += row(tbl[i], i, zone(i)); prev = i; });
+    return `<div class="card" style="padding:12px 10px"><div class="round-h" style="padding:0 4px"><span class="label">Classificação · ${DIVNAME[d]}</span>${goto('Tabela completa', 'table')}</div><table>${head}<tbody>${rows}</tbody></table></div>`;
+  }
+  if (it.k === 'liga' && d === 'C') { const cg = cGroupTables(); if (!cg) return ''; const g = cg.find(t => t.some(r => r.id === 'user')) || cg[0];
+    return `<div class="card" style="padding:12px 10px"><span class="label" style="padding:0 4px">Quadrangular · Série C</span><table>${head}<tbody>${g.map((r, i) => row(r, i, i < 2 ? 'up' : '')).join('')}</tbody></table></div>`; }
+  if (it.k !== 'cup') return '';
+  const c = it.c, cup = S.cups[c], cfg = CUPS[c], cn = cupName(c);
+  if (c === 'est' && it.st < 7) { const tb = tableOf(cup.teams, cup.results.slice(0, 7));
+    return `<div class="card" style="padding:12px 10px"><div class="round-h" style="padding:0 4px"><span class="label">Classificação · ${esc(cn)}</span>${goto('Copas', 'cups')}</div><table>${head}<tbody>${tb.map((r, i) => row(r, i, i < 4 ? 'up' : '')).join('')}</tbody></table><span class="muted" style="font-size:12px;padding:0 4px">Os 4 primeiros vão à semifinal.</span></div>`; }
+  if (isGroup(c, it.st) && cup.groups) { const gi = cup.groups.findIndex(g => g.includes('user')), g = cup.groups[gi], tb = tableOf(g, cup.results.slice(0, GROUPS[c]));
+    return `<div class="card" style="padding:12px 10px"><div class="round-h" style="padding:0 4px"><span class="label">${esc(cn)} · Grupo ${'ABCDEFGH'[gi]}</span>${goto('Todos os grupos', 'cups')}</div><table>${head}<tbody>${tb.map((r, i) => row(r, i, i < 2 ? 'up' : '')).join('')}</tbody></table><span class="muted" style="font-size:12px;padding:0 4px">Os 2 primeiros avançam ao mata-mata.</span></div>`; }
+  // mata-mata: confrontos da fase
+  const pairs = cupPairs(c, it.st), leg = legOf(c, it.st), ida = leg === 'v' ? (cup.results[it.st - 1] || []) : [];
+  const line = ([h, a]) => { const me = h === 'user' || a === 'user', i0 = ida.find(r => r.h === a && r.a === h);
+    return `<div class="res ${me ? 'me' : ''}"><span class="h">${esc(T(h).name)} ${badge(T(h))}</span><span><span class="sc">×</span>${i0 ? `<div class="muted" style="font-size:11px;text-align:center">ida ${i0.ag}-${i0.hg}</div>` : ''}</span><span class="a">${badge(T(a))} ${esc(T(a).name)}</span></div>`; };
+  const mine = pairs.filter(p => p.includes('user')), others = pairs.filter(p => !p.includes('user')).slice(0, 7);
+  return `<div class="card"><div class="round-h"><span class="label">${esc(cn)} · ${esc(cfg.stages[it.st])}</span>${goto('Chaveamento', 'cups')}</div><div class="results">${mine.concat(others).map(line).join('')}</div>${pairs.length > 8 ? `<span class="muted" style="font-size:12px">E mais ${pairs.length - 8} confrontos.</span>` : ''}</div>`;
+}
+function lastGameCard() {
+  const l = S.log[S.log.length - 1]; if (!l) return '';
+  const h = T(l.h), a = T(l.a), us = l.h === 'user' ? l.hg : l.ag, them = l.h === 'user' ? l.ag : l.hg;
+  const tag = us > them || (l.ph != null && (l.h === 'user' ? l.ph > l.pa : l.pa > l.ph)) ? ['w', 'Vitória'] : us < them || l.ph != null ? ['l', 'Derrota'] : ['d', 'Empate'];
+  const goals = (l.goals || []).map(g => `${g.min}' ${esc(g.t)} ${esc(g.n)}${g.own ? ' (contra)' : ''}`).join(' · ');
+  return `<div class="card"><div class="round-h"><span class="label">Último jogo · ${esc(l.label)}</span><span class="pill ${tag[0]}">${tag[1]}</span></div>
+    <div class="vs"><div class="side">${badge(h)}<span class="name">${esc(h.name)}</span></div><div class="mid" style="font-size:28px;color:var(--chalk)">${l.hg} - ${l.ag}</div><div class="side">${badge(a)}<span class="name">${esc(a.name)}</span></div></div>
+    ${l.agg ? `<div class="muted" style="text-align:center;font-size:12px">Agregado ${l.agg[0]} - ${l.agg[1]}</div>` : ''}${l.ph != null ? `<div class="muted" style="text-align:center;font-size:12px">Pênaltis ${l.ph} - ${l.pa}</div>` : ''}
+    ${goals ? `<div class="muted" style="text-align:center;font-size:12px">${goals}</div>` : ''}</div>`;
 }
 function tilesCard() { return `<div class="card"><span class="label">Central do clube</span><div class="tiles">${TILES.map(([l, ic, t, k, v]) => `<button class="tile" data-act="go" data-t="${t}" data-k="${k}" data-v="${v}">${ic}<span>${l}</span></button>`).join('')}</div></div>`; }
 function preCard() {
@@ -2848,7 +2892,7 @@ function finishUserMatch(ev, m, userSide) {
     else if (us - them >= 3) makeCover('GOLEADA!', `${T('user').name} atropela o ${T(ev.opp).name}: ${T(ev.home).abbr} ${ures.hg} x ${ures.ag} ${T(ev.away).abbr}.${scorerText(evs, 0)}`, 'user');
     else if (dby && us < them) makeCover(`VEXAME NO ${dby.toUpperCase()}`, `${T('user').name} perde para o rival ${T(ev.opp).name}. A torcida cobra.`, ev.opp);
   }
-  const rec = { label, h: ev.home, a: ev.away, hg: ures.hg, ag: ures.ag, ph: ures.ph, pa: ures.pa };
+  const rec = { label, h: ev.home, a: ev.away, hg: ures.hg, ag: ures.ag, ph: ures.ph, pa: ures.pa, goals: m.events.filter(e => !e.own || e.name).map(e => ({ min: e.min, t: m.teams[e.side].abbr, n: e.name, own: e.own })) };
   if (leg === 'v') { const ag = aggregate(S.cups[ev.it.c], ev.it.st, rec); rec.agg = [ag.h, ag.a]; }
   S.log.push(rec);
   const res = us > them ? 'vence' : us < them ? 'perde para' : 'empata com';
