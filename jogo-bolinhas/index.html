@@ -1243,7 +1243,16 @@ function genStaffMarket() {
   for (const r in STAFF) out[r] = shuffle(STAFF_N).slice(0, 3).map(n => { const l = rint(1, 5); return { name: n, lvl: l, fee: Math.round(staffSalary(l) * 15 / 10) * 10 }; });
   return out;
 }
+const FEM = ['Chapecoense', 'Ponte Preta', 'Ferroviária', 'Inter de Limeira', 'Portuguesa-RJ', 'Tuna Luso', 'Aparecidense', 'Jacuipense', 'Juazeirense', 'Real Madrid'].filter(n => n !== 'Real Madrid');
+const ART = { o: 'a', O: 'A', do: 'da', Do: 'Da', no: 'na', No: 'Na', ao: 'à', Ao: 'À', pelo: 'pela', Pelo: 'Pela', 'ex-': 'ex-' };
+function fem(t) {
+  if (!t) return t;
+  for (const n of FEM) t = t.replace(new RegExp(`\\b(o|O|do|Do|no|No|ao|Ao|pelo|Pelo) ${n.replace(/[-]/g, '\\-')}`, 'g'), (m, a) => `${ART[a]} ${n}`).replace(new RegExp(`(Desfalque|Zebra|Bastidores|Esfriou)( no| do)? ${n}`, 'g'), m => m.replace(' no ', ' na ').replace(' do ', ' da '));
+  for (const n of FEM) t = t.replace(new RegExp(`${n} é o (\\d+)º colocado`, 'g'), `${n} é a $1ª colocada`).replace(new RegExp(`${n} é o (\\d+)º`, 'g'), `${n} é a $1ª`);
+  return t;
+}
 function news(text, tag, tid, body) {
+  text = fem(text); body = fem(body);
   if (!tid) { let best = 1e9; for (const id in S.teams) { const n = S.teams[id].name, k = n.length > 3 ? text.indexOf(n) : -1; if (k >= 0 && (k < best || (k === best && id === 'user'))) { best = k; tid = id; } } }
   S.news.unshift({ s: S.season, when: curLabel(), text, tag, tid: tid || null, body: body || '' });
   if (S.news.length > 220) S.news.length = 220;
@@ -1909,6 +1918,7 @@ function homeView() {
   const dby = derbyName(me, op), locked = !S.pre, mi = matchInfo(ev);
   return `
   ${S.cover ? coverCard() : ''}
+  ${S.preview && S.preview.key === S.ci + '/' + S.season ? `<div class="paper"><div class="mast"><b>Prévia</b><span>${esc(curLabel())}</span></div><div class="sub" style="font-weight:700;font-size:18px">${esc(S.preview.head)}</div><div class="sub" style="font-size:14px">${esc(S.preview.body)}</div></div>` : ''}
   ${!S.pre ? preCard() : ''}
   <div class="card has-bg" id="next-card"><div class="st-bg" ${host.stadium.photo ? `style="background-image:url(${host.stadium.photo})"` : ''}>${host.stadium.photo ? '' : stadiumArt(host, ev.weather)}</div><div class="st-shade"></div>
     <div class="round-h"><span class="label">${esc(itemLabel(ev.it))}</span><span class="label">${ev.neutral ? 'Campo neutro' : ev.home === 'user' ? 'Casa' : 'Fora'}</span></div>
@@ -2442,12 +2452,12 @@ function moneyView() {
 }
 const NEWS_SEC = { 'Seu jogo': 'Seu clube', Resultado: 'Rodada', Rodada: 'Rodada', Tabela: 'Rodada', 'Série C': 'Rodada', Mercado: 'Mercado', Proposta: 'Mercado', Rumor: 'Mercado', Empréstimo: 'Mercado', Contrato: 'Mercado', Base: 'Mercado',
   Lesão: 'Médico', Suspensão: 'Médico', Polêmica: 'Polêmica', Torcida: 'Polêmica', Entrevista: 'Polêmica', Eleição: 'Bastidores', SAF: 'Bastidores', Finanças: 'Bastidores', Estrutura: 'Bastidores', Patrocínio: 'Bastidores', Comissão: 'Bastidores', Carreira: 'Bastidores', Elenco: 'Seu clube',
-  Campeão: 'Títulos', Prêmios: 'Títulos', Ídolo: 'Títulos', Seleção: 'Seleção', Copas: 'Copas', Temporada: 'Geral' };
+  Campeão: 'Títulos', Prêmios: 'Títulos', Ídolo: 'Títulos', Seleção: 'Seleção', Copas: 'Copas', Temporada: 'Geral', 'Prévia': 'Prévias' };
 const secOf = n => NEWS_SEC[n.tag] || (/Copa|Liberta|Sul-Am|Mundial|Nordest|Verde|Supercopa|Recopa|Pré-Liberta|Campeonato|Paulistão/.test(n.tag) ? 'Copas' : 'Geral');
 let newsFilter = 'Todas';
 function headOf(t) { let m = t.search(/[.!?:]\s/); if (m > 0 && m < 20 && t[m] === ':') { t = t.slice(m + 2); m = t.search(/[.!?]\s/); } let h = m > 0 ? t.slice(0, t[m] === ':' ? m : m + 1) : t; if (h.length > 90) h = h.slice(0, 88).replace(/\s\S*$/, '') + '…'; return h; }
 function newsView() {
-  const F = ['Todas', 'Seu clube', 'Rodada', 'Mercado', 'Copas', 'Polêmica', 'Médico', 'Bastidores', 'Títulos'];
+  const F = ['Todas', 'Prévias', 'Seu clube', 'Rodada', 'Mercado', 'Copas', 'Polêmica', 'Médico', 'Bastidores', 'Títulos'];
   let list = S.news;
   if (newsFilter === 'Seu clube') list = list.filter(n => n.tid === 'user' || secOf(n) === 'Seu clube');
   else if (newsFilter !== 'Todas') list = list.filter(n => secOf(n) === newsFilter);
@@ -2456,7 +2466,7 @@ function newsView() {
   const art = (n, lead) => { const h = headOf(n.text), hh = h.replace(/…$/, ''), k = n.text.indexOf(hh); let rest = k >= 0 && !h.endsWith('…') ? (n.text.slice(0, k) + n.text.slice(k + hh.length)).replace(/^[\s.:!?]*(Bastidores|Esfriou)?[\s.:!?]*/, '').trim() : n.text; const body = [rest, n.body].filter(Boolean).join(' '); const t = n.tid && S.teams[n.tid];
     return lead ? `<div class="lead">${t ? crest(t, 64) : ''}<div><span class="kick">${esc(secOf(n))} · ${esc(n.tag)}</span><h3>${esc(h)}</h3>${body ? `<p class="body">${esc(body)}</p>` : ''}<span class="meta">Temporada ${n.s} · ${esc(n.when)}</span></div></div>`
       : `<div class="art"><div><span class="kick">${esc(secOf(n))}</span><h4>${esc(h)}</h4>${body ? `<p class="body">${esc(body)}</p>` : ''}<span class="meta">T${n.s} · ${esc(n.when)}</span></div>${t ? crest(t, 28) : ''}</div>`; };
-  const leadI = Math.max(0, list.findIndex(n => ['Campeão', 'Seu jogo', 'Polêmica', 'Prêmios'].includes(n.tag)));
+  const leadI = Math.max(0, list.findIndex(n => ['Campeão', 'Prévia', 'Seu jogo', 'Polêmica', 'Prêmios'].includes(n.tag) && (n.tag !== 'Prévia' || n.tid === 'user')));
   return `<div class="chips">${F.map(f => `<button data-act="nf" data-v="${f}" aria-pressed="${newsFilter === f}">${f}</button>`).join('')}</div>
   <div class="news-paper"><div class="mast"><b>Diário da Bolinha</b><span>Temporada ${S.season} · ${esc(curLabel())} · edição nº ${ed}</span></div>
   ${list.length ? art(list[leadI], true) + `<div class="cols">${list.filter((_, i) => i !== leadI).map(n => art(n, false)).join('')}</div>` : '<p class="body">Nenhuma notícia nesta seção.</p>'}</div>`;
@@ -2645,6 +2655,118 @@ function advanceAuto() {
     if (it.k === 'cup' && (it.c === 'lib' || it.c === 'sul')) setupContinental(it.c);
     if (involvesUser(it)) break;
     processItem(it, null); S.ci++;
+  }
+  if (S.ci < S.cal.length && !S.fired) { try { makePreview(); } catch (e) {} }
+}
+/* ---------- prévias: o que está em jogo antes de cada partida ---------- */
+const ptsT = n => `${n} ponto${n === 1 ? '' : 's'}`;
+const TOTAL_R = d => d === 'C' ? 19 : d === 'D' ? 15 : 38;
+const VAGA = { A: 'na Libertadores', B: 'de acesso à Série A', C: 'no quadrangular', D: 'de acesso à Série C' };
+function stakes(id, d) {
+  if (!LG.includes(d)) return null;
+  const tbl = standings(d), n = tbl.length, i = tbl.findIndex(x => x.id === id); if (i < 0) return null;
+  const row = tbl[i], R = TOTAL_R(d) - row.j; if (R <= 0) return null;
+  if (row.j < Math.ceil(TOTAL_R(d) / 3)) return { pos: i + 1, pts: row.pts, R, n, d, tbl, early: true };
+  const hasZone = d !== 'D' && (d !== 'C' || (S.divisions.D || []).length), zi = hasZone ? n - 4 : n;
+  const st = { pos: i + 1, pts: row.pts, R, n, d, tbl };
+  if (hasZone && i >= zi) { st.k = 'zona'; st.gap = tbl[zi - 1].pts - row.pts; st.rival = tbl[zi - 1].id; st.done = row.pts + 3 * R < tbl[zi - 1].pts; }
+  else if (hasZone && row.pts - tbl[zi].pts <= 3) { st.k = 'perigo'; st.gap = row.pts - tbl[zi].pts; st.rival = tbl[zi].id; }
+  if (i === 0) { st.t = 'lider'; st.gap2 = row.pts - tbl[1].pts; st.clinch = st.gap2 + 3 > 3 * (R - 1); }
+  else if (i <= 3 && tbl[0].pts - row.pts <= 4) { st.t = 'titulo'; st.gap2 = tbl[0].pts - row.pts; st.rival2 = tbl[0].id; }
+  const line = d === 'A' ? 6 : d === 'C' ? 8 : 4;
+  if (!st.t && i < line) st.v = 'dentro';
+  else if (!st.t && i >= line && tbl[line - 1].pts - row.pts <= 4) { st.v = 'busca'; st.gap3 = tbl[line - 1].pts - row.pts; }
+  return st;
+}
+function fixtureOf(d, r, id) { const f = (S.fixtures[d][r] || []).find(x => x.includes(id)); return f ? T(f[0] === id ? f[1] : f[0]) : null; }
+function formStr(id) { const f = oppScout(id).form; return f.length ? f.join('') : ''; }
+function topScorer(t) { return t.players.slice().sort((a, b) => gols(b) - gols(a))[0]; }
+function makePreview() {
+  if (S.previewCi === S.ci + '/' + S.season) return;
+  const ev = nextEvent(); if (!ev) return;
+  S.previewCi = S.ci + '/' + S.season;
+  const me = T('user'), op = T(ev.opp), it = ev.it, d = userDiv(), dby = derbyName(me, op), mi = matchInfo(ev);
+  const where = ev.neutral ? 'em campo neutro' : ev.home === 'user' ? `em casa, no ${me.stadium.name}` : `fora, no ${op.stadium.name}`;
+  let head = '', parts = [];
+  if (it.k === 'liga' && !(d === 'C' && it.r >= 19)) {
+    const st = stakes('user', d), so = stakes(op.id, d);
+    if (st) {
+      const six = so && (so.k === 'zona' || so.k === 'perigo') && (st.k === 'zona' || st.k === 'perigo');
+      if (st.done) head = `Já sem chances de escapar, ${me.name} cumpre tabela contra o ${op.name}`;
+      else if (six) head = `Jogo de seis pontos: ${me.name} e ${op.name} se enfrentam na luta contra a queda`;
+      else if (st.k === 'zona') head = `${me.name} luta para escapar do rebaixamento e encara o ${op.name}`;
+      else if (st.t === 'lider' && st.clinch && st.R <= 3) head = `${me.name} pode encaminhar o título diante do ${op.name}`;
+      else if (st.t === 'lider') head = `Líder, ${me.name} encara o ${op.name} para manter a ponta`;
+      else if (st.t === 'titulo') head = `${me.name} encara o ${op.name} de olho na liderança`;
+      else if (st.v === 'busca') head = `${me.name} busca vaga ${VAGA[d]} contra o ${op.name}`;
+      else if (st.k === 'perigo') head = `${me.name} tenta se afastar da zona de rebaixamento contra o ${op.name}`;
+      else if (st.v === 'dentro' && st.R <= 10) head = `${me.name} quer garantir a vaga ${VAGA[d]} contra o ${op.name}`;
+      parts.push(`O ${me.name} é o ${st.pos}º colocado da ${DIVNAME[d]}, com ${ptsT(st.pts)}, e restam ${st.R} rodada${st.R > 1 ? 's' : ''}.`);
+      if (st.k === 'zona') parts.push(st.done ? 'A queda já está matematicamente confirmada.' : `Está na zona de rebaixamento, a ${st.gap} ponto${st.gap === 1 ? '' : 's'} do ${T(st.rival).name}, primeiro time fora dela.`);
+      if (st.k === 'perigo') parts.push(st.gap === 0 ? `Está empatado em pontos com o ${T(st.rival).name}, primeiro time da zona.` : `A vantagem para a zona é de apenas ${st.gap} ponto${st.gap === 1 ? '' : 's'} sobre o ${T(st.rival).name}.`);
+      if (st.t === 'lider') parts.push(`Tem ${st.gap2} ponto${st.gap2 === 1 ? '' : 's'} de vantagem sobre o ${T(st.tbl[1].id).name}, o vice.`);
+      if (st.t === 'titulo') parts.push(`Está a ${st.gap2} ponto${st.gap2 === 1 ? '' : 's'} do líder ${T(st.rival2).name}.`);
+      if (st.v === 'busca') parts.push(`Está a ${st.gap3} ponto${st.gap3 === 1 ? '' : 's'} da zona de classificação ${VAGA[d]}.`);
+      // depende de outros resultados na reta final
+      if (st.R <= 6 && !st.done) {
+        if (st.k === 'zona') { const o2 = fixtureOf(d, it.r, st.rival); if (o2) parts.push(`Além de vencer, o ${me.name} depende de um tropeço do ${T(st.rival).name}, que enfrenta o ${o2.name} nesta rodada.`); }
+        if (st.t === 'titulo') { const o2 = fixtureOf(d, it.r, st.rival2); if (o2) parts.push(`Na briga pelo título, o time torce contra o líder ${T(st.rival2).name}, que pega o ${o2.name}.`); }
+        if (st.t === 'lider' && st.clinch) { const vice = st.tbl[1].id, o2 = fixtureOf(d, it.r, vice); parts.push(`Uma vitória deixa o título muito perto${o2 ? `, principalmente se o ${T(vice).name} tropeçar diante do ${o2.name}` : ''}.`); }
+        if (st.v === 'dentro' || st.k === 'perigo' || st.v === 'busca') parts.push(st.k === 'perigo' || st.v === 'busca' ? 'Cada ponto agora vale ouro.' : 'Depende só de si para confirmar a vaga.');
+      }
+      if (so) parts.push(`O ${op.name} é o ${so.pos}º, com ${ptsT(so.pts)}${so.k === 'zona' ? ', também na zona de rebaixamento' : so.t === 'lider' ? ', e lidera o campeonato' : ''}.`);
+    }
+  } else if (it.k === 'cup') {
+    const c = it.c, cfg = CUPS[c], leg = legOf(c, it.st), stage = cfg.stages[it.st], last = it.st === cfg.stages.length - 1, cn = cupName(c), mas = c === 'est', cnNa = (mas ? 'no ' : 'na ') + cn, cnDa = (mas ? 'do ' : 'da ') + cn, cnPela = (mas ? 'pelo ' : 'pela ') + cn;
+    if (leg === 'v') {
+      const ida = (S.cups[c].results[it.st - 1] || []).find(r => r.h === ev.away && r.a === ev.home);
+      if (ida) {
+        const myIda = ida.h === 'user' ? ida.hg : ida.ag, opIda = ida.h === 'user' ? ida.ag : ida.hg, diff = myIda - opIda;
+        parts.push(`No jogo de ida, o placar foi ${T(ida.h).name} ${ida.hg} x ${ida.ag} ${T(ida.a).name}.`);
+        if (diff > 0) { head = last ? `${me.name} defende a vantagem na decisão ${cnDa}` : `${me.name} joga pelo empate contra o ${op.name} ${cnNa}`; parts.push(`O ${me.name} pode até perder por ${diff > 1 ? `até ${diff - 1} gol${diff - 1 > 1 ? 's' : ''} de diferença` : 'nenhum gol de diferença'}: o empate classifica, e uma derrota por ${diff} gol${diff > 1 ? 's' : ''} leva aos pênaltis.`); }
+        else if (diff < 0) { head = `${me.name} precisa reverter a desvantagem contra o ${op.name} ${cnNa}`; parts.push(`Precisa vencer por ${-diff + 1} gols para avançar direto; vitória por ${-diff} leva aos pênaltis.`); }
+        else { head = `Tudo igual: ${me.name} e ${op.name} decidem a vaga ${cnNa}`; parts.push('Quem vencer avança; novo empate leva a decisão para os pênaltis.'); }
+      }
+    } else if (leg === 1 || leg === 'i') {
+      head = last ? `Decisão: ${me.name} e ${op.name} disputam o título ${cnDa}` : leg === 'i' ? `${me.name} abre o confronto contra o ${op.name} ${cnNa}` : `${me.name} e ${op.name} fazem jogo único ${cnNa}`;
+      parts.push(leg === 'i' ? `É o jogo de ida (${stage.replace(' · ida', '')}). ${ev.home === 'user' ? 'Jogando em casa, a ideia é construir vantagem.' : 'Fora de casa, um empate já é bom resultado.'}` : awayAdv(c, it.st) ? 'Jogo único em que o empate classifica o visitante.' : 'Jogo único: quem vencer avança, e o empate leva aos pênaltis.');
+    } else if (isGroup(c, it.st)) {
+      const g = (S.cups[c].groups || []).find(x => x.includes('user')) || (c === 'est' ? S.cups.est.teams : null);
+      const n = c === 'est' ? 7 : GROUPS[c];
+      if (g) { const tb = tableOf(g, S.cups[c].results.slice(0, n)), pos = tb.findIndex(x => x.id === 'user') + 1, need = c === 'est' ? 4 : 2, lastG = it.st === n - 1;
+        parts.push(`O ${me.name} é o ${pos}º do ${c === 'est' ? 'campeonato' : 'grupo'}, com ${tb[pos - 1].pts} pontos.`);
+        if (lastG) { head = pos <= need ? `${me.name} depende só de si para avançar ${cnNa}` : `${me.name} precisa vencer e torcer para avançar ${cnNa}`; parts.push(pos <= need ? 'Uma vitória garante a classificação.' : `Precisa vencer e torcer contra o ${T(tb[need - 1].id).name}, que hoje ocupa a última vaga.`); }
+      }
+    }
+    if (!head) head = `${me.name} encara o ${op.name} ${cnPela}`;
+  }
+  if (!head) head = dby ? `Clássico: ${dby} agita a rodada` : it.k === 'liga' ? `${me.name} encara o ${op.name} pela ${it.r + 1}ª rodada da ${DIVNAME[d]}` : `${me.name} encara o ${op.name} pela ${itemLabel(it)}`;
+  if (dby && !head.includes(dby)) parts.push(`É o ${dby}, clássico que vale mais do que três pontos para as duas torcidas.`);
+  const fm = formStr('user'), fo = formStr(op.id);
+  if (fm || fo) parts.push(`${fm ? `O ${me.name} vem de ${fm.split('').map(x => x === 'V' ? 'vitória' : x === 'E' ? 'empate' : 'derrota').slice(-3).join(', ')} nos últimos jogos` : ''}${fm && fo ? '; ' : ''}${fo ? `o ${op.name} soma ${fo.split('V').length - 1} vitória${fo.split('V').length - 1 === 1 ? '' : 's'} em ${fo.length}` : ''}.`);
+  const outs = me.players.slice(0, 11).filter(p => !avail(p));
+  if (outs.length) parts.push(`Desfalques: ${outs.map(p => `${p.name} (${p.inj > 0 ? 'lesão' : p.susp > 0 ? 'suspenso' : 'Seleção'})`).join(', ')}.`);
+  const ts = topScorer(me), os = oppScout(op.id).stars[0];
+  if (ts && gols(ts)) parts.push(`${ts.name} é o artilheiro do time na temporada, com ${gols(ts)} gol${gols(ts) > 1 ? 's' : ''}.`);
+  if (os) parts.push(`No ${op.name}, a atenção é para ${os.name}.`);
+  parts.push(`A partida é ${where}, ${mi.when.toLowerCase()}, com arbitragem de ${mi.ref}.`);
+  const body = parts.join(' ');
+  news(head + '.', 'Prévia', 'user', body);
+  S.preview = { key: S.previewCi, head: fem(head), body: fem(body) };
+  // jogo da rodada na Série A
+  if (it.k === 'liga' && (S.fixtures.A[it.r] || []).length) {
+    let best = null, bs = 0;
+    for (const [h, a] of S.fixtures.A[it.r]) {
+      if (h === 'user' || a === 'user') continue;
+      const sh = stakes(h, 'A'), sa = stakes(a, 'A'); if (!sh || !sa) continue;
+      const score = (sh.pos <= 3 && sa.pos <= 3 ? 5 : 0) + ((sh.k && sa.k && sh.k !== 'perigo' || sa.k === 'zona' && sh.k) ? 4 : 0) + (derbyName(T(h), T(a)) ? 3 : 0) + (sh.R <= 6 ? 1 : 0);
+      if (score > bs) { bs = score; best = [h, a, sh, sa]; }
+    }
+    if (best && bs >= 3 && !best[2].early) {
+      const [h, a, sh, sa] = best, dn = derbyName(T(h), T(a));
+      const hd = sh.pos <= 3 && sa.pos <= 3 ? `Jogo da rodada: ${T(h).name} e ${T(a).name} duelam na parte de cima da tabela` : (sh.k && sa.k) ? `Jogo de seis pontos: ${T(h).name} e ${T(a).name} brigam para fugir da queda` : `Jogo da rodada: ${dn} movimenta a Série A`;
+      news(hd + '.', 'Prévia', h, `O ${T(h).name} (${sh.pos}º, ${ptsT(sh.pts)}) recebe o ${T(a).name} (${sa.pos}º, ${ptsT(sa.pts)})${dn ? ` no ${dn}` : ''}. ${sh.R <= 6 ? `Faltando ${sh.R} rodada${sh.R === 1 ? '' : 's'}, um tropeço pode custar a temporada.` : 'Um resultado positivo muda o cenário na tabela.'}`);
+    }
   }
 }
 function finishUserMatch(ev, m, userSide) {
