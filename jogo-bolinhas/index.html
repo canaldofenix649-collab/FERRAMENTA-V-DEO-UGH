@@ -956,6 +956,29 @@ const SQUADS = {
   CHA: ['Anderson',_,'Fabrício Bruno',_,_,_,'Jean Carlos',_,'Walter Clar',_,'Bruno Rangel'],
   REM: ['Marcelo Rangel',_,'Marllon','Banguera',_,'Cantillo','Poveda','Jajá','Diego Hernández','Yago Pikachu','Alef Manga'],
 };
+/* idades reais na temporada 2026 (pelo ano de nascimento), na ordem dos titulares; null = sorteada */
+const AGES = {
+  FLA: [31, 33, 30, 30, 35, 35, 32, 29, 32, 27, 29],
+  PAL: [39, 22, 33, 29, 28, 27, 30, 31, 33, 21, 26],
+  BOT: [30, 27, 31, 35, 34, 30, 31, 29, 23, 28, 28],
+  CRU: [39, 31, 28, 32, 23, 32, 33, 25, 30, 27, 24],
+  FLU: [46, 36, 42, 26, 34, 25, 25, 28, 37, 28, 38],
+  SAO: [37, 35, 35, 30, 33, 24, 26, 33, 33, 34, 33],
+  CAM: [36, 24, 33, 29, 29, 28, 26, 32, 27, 40, 31],
+  INT: [33, 26, 26, 24, 26, 29, 36, 35, 26, 33, 31],
+  COR: [27, 26, 33, 34, 24, 30, 21, 26, 35, 32, 25],
+  BAH: [30, 33, 33, 29, 27, 27, 28, 37, 31, 26, 35],
+  GRE: [36, 30, 35, 27, 29, 30, 29, 37, 30, 23, 35],
+  RBB: [29, 27, 31, 27, 29, 34, 27, 25, 23, 34, 27],
+  VAS: [31, 30, 24, 23, 26, 28, 34, 34, 27, 20, 38],
+  SAN: [26, 29, 29, 32, 27, 33, 33, 26, 26, 31, 34],
+  MIR: [39, 33, 28, 31, 37, 29, 31, 29, 27, 27, 30],
+  CAP: [36, null, null, null, null, 28, 24, 25, null, 34, 25],
+  VIT: [28, 35, 33, 26, 33, 25, 28, 28, 39, 29, 30],
+  CFC: [22, null, null, null, null, 33, 36, 31, 21, null, 32],
+  CHA: [null, null, 30, null, null, null, 34, null, 32, null, null],
+  REM: [38, null, 34, null, null, 33, null, null, 26, 34, 32]
+};
 /* jogadores estrangeiros (não são convocados para a Seleção Brasileira) */
 const ABROAD = new Set(['Arrascaeta','Varela','De la Cruz','Pulgar','Gustavo Gómez','Piquerez','Aníbal Moreno','Flaco López','Giay','Savarino','Barboza','Bastos','Villalba','Lucas Romero','Freytes','Canobbio','Germán Cano','Arboleda','Alan Franco','Calleri','Junior Alonso','Fausto Vera','Rochet','Aguirre','Bernabei','Carbonero','Borré','Garro','Carrillo','Memphis','Villasanti','Kannemann','Amuzu','Braithwaite','Cristaldo','Andrés Hurtado','Guzmán Rodríguez','Pitta','Nuno Moreira','Vegetti','Rollheiser','Barreal','Escobar','Cédric','Portilla','Zapelli','Mendoza','Viveros','Raúl Cáceres','Cantillo','Banguera','Diego Hernández','Poveda','Walter Clar','Lucas Halter']);
 const EURO = ['Benfica','Porto','Sporting','Real Betis','Sevilla','Villarreal','Lyon','Monaco','Ajax','PSV','Brighton','West Ham','Atlético de Madrid','Milan','Roma','Zenit','Shakhtar','Lille'];
@@ -1054,7 +1077,9 @@ function makeTeam(club, div, id, base) {
   const st = STADIUMS[ab] || [foreign ? x5 : 'Estádio Municipal', foreign ? x6 : 8000];
   const real = !!SQUADS[ab], formation = real ? '4-2-3-1' : pick(Object.keys(FORM));
   const lvl = div === 'A' ? 4 : div === 'B' ? 3 : div === 'D' ? 1 : 2;
-  return { id, name, abbr: ab, c1, c2, pt: pt || '', state: foreign ? null : x5, formation, players: makeSquad(x7 || base, SQUADS[ab], formation, real),
+  const squad = makeSquad(x7 || base, SQUADS[ab], formation, real);
+  if (AGES[ab]) squad.forEach((p, i) => { const a = AGES[ab][i]; if (i < 11 && a) { p.age = a; if (a > 23) p.pot = pOvr(p); } });
+  return { id, name, abbr: ab, c1, c2, pt: pt || '', state: foreign ? null : x5, formation, players: squad,
     stadium: { name: st[0], cap: st[1], comfort: 0 }, morale: 60, chem: 75, staff: { fis: lvl, med: lvl, aux: lvl, olh: lvl }, sponsor: pick(SPONSORS), lastXI: [] };
 }
 function value(p) {
@@ -1096,6 +1121,7 @@ function newCareer(ch) {
     log: [], form: [], youth: [], tutDone: false, qualified: { lib: [], sul: [] }, lastGate: null, leader: {}, titles: [], members: 0,
     ct: 0, baseLvl: 0, board: null, euro: [], loansOut: [], loansIn: [], staffMarket: null, awards: null, fired: false, minor: {}, weather: {}, cGroups: null, sound: true, pid: 1 };
   Object.assign(S, defaults());
+  S.agesFixed = true;
   let k = 0;
   for (const d of DIVS) CLUBS[d].forEach((club, i, arr) => {
     if (ch.own && d === 'C' && i === ch.replace) { S.teams.user = ch.own; S.divisions.C.push('user'); return; }
@@ -1819,7 +1845,7 @@ function takeOver(id) {
 /* =====================================================================
    SALVAR
    ===================================================================== */
-try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); } } catch (e) { S = null; }
+try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); if (!S.agesFixed) { for (const t of Object.values(S.teams)) { const ag = AGES[t.abbr], sq = SQUADS[t.abbr]; if (!ag || !sq) continue; for (const p of t.players) { const k = sq.indexOf(p.name); if (k >= 0 && ag[k]) { p.age = ag[k] + (S.season - 1); if (p.age > 23) p.pot = Math.min(p.pot, Math.max(pOvr(p), p.pot)); } } } S.agesFixed = true; } } } catch (e) { S = null; }
 const save = () => { if (!S) return; S.pid = PID; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 /* =====================================================================
