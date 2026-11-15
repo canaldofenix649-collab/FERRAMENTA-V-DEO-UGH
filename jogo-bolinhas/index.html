@@ -232,6 +232,15 @@ nav.tabs button[aria-current="true"] svg { filter: drop-shadow(0 0 6px rgba(255,
 #next-card { border: 1px solid var(--line); background: radial-gradient(120% 90% at 50% 0%, #1d4a33 0%, var(--panel) 60%); position: relative; overflow: hidden; }
 #next-card::before { content: ""; position: absolute; left: 50%; top: -60px; width: 120px; height: 120px; border: 2px solid rgba(255,255,255,.07); border-radius: 50%; transform: translateX(-50%); pointer-events: none; }
 #next-card::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: rgba(255,255,255,.07); pointer-events: none; }
+.st-bg { position: absolute; inset: 0; background-size: cover; background-position: center; z-index: 0; }
+.st-bg svg { width: 100%; height: 100%; display: block; }
+.st-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,20,15,.45) 0%, rgba(8,20,15,.8) 40%, rgba(8,20,15,.93) 100%); z-index: 0; }
+#next-card > *:not(.st-bg):not(.st-shade) { position: relative; z-index: 1; }
+#next-card.has-bg::before, #next-card.has-bg::after { display: none; }
+.match-info { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.match-info span { font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 999px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12); color: var(--chalk); }
+.match-info b { color: var(--amber); font-weight: 700; }
+.vs .side.you .name::after { content: " (você)"; font-weight: 400; color: var(--amber); font-size: 12px; }
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .tile { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--chalk); min-width: 0; }
 .tile svg { width: 24px; height: 24px; color: var(--amber); }
@@ -928,6 +937,7 @@ const TRAITS = { lider: ['Líder', 'Segura a moral do time nas derrotas.'], temp
 const CELEBS = ['corre para a torcida', 'faz o aviãozinho', 'faz uma dancinha', 'beija o escudo', 'dá uma cambalhota', 'faz coração com as mãos', 'manda beijo para a família', 'sobe no alambrado', 'ajoelha e aponta para o céu', 'imita o goleiro'];
 const CHANTS = ['Vamos, vamos, {n}! Hoje tem que ganhar!', 'Ô, ô, ô, o {n} é o terror!', 'Dá-lhe, dá-lhe, dá-lhe, {n}!', 'Eu sou {n} até morrer!', 'Ninguém cala esse amor, {n}!', 'Vai pra cima deles, {n}!'];
 const INVESTORS = ['Grupo Bola de Ouro', 'Fundo Gol Investimentos', 'Holding Escanteio', 'Capital Pênalti', 'Rede Arquibancada', 'Consórcio Camisa 10'];
+const REFS = ['Ademir Cabral', 'Rogério Fontana', 'Marcelo Aguiar', 'Cláudia Ventura', 'Edson Bittencourt', 'Wagner Lacerda', 'Paulo Sérgio Tavares', 'Renata Holanda', 'Luiz Carlos Miranda', 'Hélio Damasceno', 'Bruno Esteves', 'Jorge Quintela', 'Sandro Pimentel', 'Fernanda Rocha', 'Otávio Brandão', 'Raul Teixeira'];
 const PAPERS = ['Diário da Bola', 'Gazeta do Gol', 'Jornal da Arquibancada', 'O Placar'];
 const PATTERNS = [['', 'Lisa'], ['v', 'Listras'], ['h', 'Listras deitadas'], ['b', 'Faixa'], ['d', 'Faixa diagonal']];
 const KO2 = (n) => [`${n} · ida`, `${n} · volta`];
@@ -1811,18 +1821,17 @@ function homeView() {
   let aggTxt = '';
   if (isLeg2) { const ida = S.cups[ev.it.c].results[ev.it.st - 1].find(r => r.h === ev.away && r.a === ev.home); if (ida) aggTxt = ` · ida: ${T(ida.h).abbr} ${ida.hg} x ${ida.ag} ${T(ida.a).abbr}`; }
   const euro = S.euro.map((o, i) => { const p = findP(me, o.pid); return p ? `<div class="card alert"><span class="label">Proposta da Europa</span><div><b>${esc(o.club)}</b> oferece <b>${brl(o.offer)}</b> por ${esc(p.name)} (${pOvr(p)}, ${p.age} anos). Valor de mercado: ${brl(value(p))}.</div><div class="btns"><button class="btn small primary" data-act="euroY" data-i="${i}">Vender</button><button class="btn small" data-act="euroN" data-i="${i}">Recusar</button></div></div>` : ''; }).join('');
-  const dby = derbyName(me, op), locked = !S.pre;
+  const dby = derbyName(me, op), locked = !S.pre, mi = matchInfo(ev);
   return `
   ${S.cover ? coverCard() : ''}
   ${!S.pre ? preCard() : ''}
-  <div class="card" id="next-card">
+  <div class="card has-bg" id="next-card"><div class="st-bg" ${host.stadium.photo ? `style="background-image:url(${host.stadium.photo})"` : ''}>${host.stadium.photo ? '' : stadiumArt(host, ev.weather)}</div><div class="st-shade"></div>
     <div class="round-h"><span class="label">${esc(itemLabel(ev.it))}</span><span class="label">${ev.neutral ? 'Campo neutro' : ev.home === 'user' ? 'Casa' : 'Fora'}</span></div>
     ${dby ? `<div style="text-align:center"><span class="derby">CLÁSSICO · ${esc(dby.toUpperCase())}</span></div>` : ''}
     <div class="vs">
-      <div class="side">${badge(me, 'lg')}<span class="name">${esc(me.name)}</span><span class="ovr">Força ${ovr(me)}</span></div>
-      <div class="mid">×</div>
-      <div class="side">${badge(op, 'lg')}<span class="name">${esc(op.name)}</span><span class="ovr">Força ${ovr(op)}</span></div>
+      ${[T(ev.home), T(ev.away)].map((t, k) => `<div class="side ${t.id === 'user' ? 'you' : ''}">${badge(t, 'lg')}<span class="name">${esc(t.name)}</span><span class="ovr">${k === 0 && !ev.neutral ? 'Mandante · ' : ''}Força ${ovr(t)}</span></div>`).join('<div class="mid">×</div>')}
     </div>
+    <div class="match-info"><span><b>${esc(mi.rnd)}</b></span><span>${esc(mi.when)}</span><span>Árbitro: <b>${esc(mi.ref)}</b></span>${ev.neutral ? '' : `<span>Público esperado: <b>${num(mi.crowd)}</b></span>`}</div>
     <div class="muted" style="text-align:center;font-size:13px">${esc(host.stadium.name)} · ${wl}${aggTxt}${ev.it.k === 'cup' && awayAdv(ev.it.c, ev.it.st) ? ' · jogo único: empate classifica o visitante' : ev.it.k === 'cup' && legOf(ev.it.c, ev.it.st) && legOf(ev.it.c, ev.it.st) !== 'i' ? ' · empate no placar decide nos pênaltis' : ''}</div>
     <div class="btns"><button class="btn primary" data-act="play" ${locked ? 'disabled' : ''}>Jogar partida</button><button class="btn" data-act="quick" ${locked ? 'disabled' : ''}>Simular</button></div>
     ${locked ? '<span class="muted" style="font-size:12px;text-align:center">Escolha o foco da pré-temporada acima para começar.</span>' : ''}
@@ -1847,6 +1856,30 @@ function homeView() {
   ${S.news.length ? `<div class="card"><div class="round-h"><span class="label">Últimas notícias</span><button class="btn small" data-act="goto" data-v="news">Ver todas</button></div><div class="news">${S.news.slice(0, 3).map(newsItem).join('')}</div></div>` : ''}`;
 }
 const TILES = [['Escalação',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v4M12 17v4"/><circle cx="12" cy="12" r="3"/></svg>`,'squad','squad','squad'],['Mercado',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>`,'squad','squad','market'],['Tabela',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 10h16M4 15h16M4 20h16M8 3v18"/></svg>`,'comp','comp','table'],['Copas',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v3M8 20h8M9 17h6"/></svg>`,'comp','comp','cups'],['Artilharia',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>`,'comp','comp','art'],['Estádio',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="14" rx="9" ry="5"/><ellipse cx="12" cy="14" rx="5" ry="2.2"/><path d="M3 14V9c0-2.8 4-5 9-5s9 2.2 9 5v5"/></svg>`,'club','club','stadium'],['Finanças',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>`,'club','club','money'],['Torcida',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="9" r="2.5"/><circle cx="17" cy="9" r="2.5"/><circle cx="12" cy="7" r="2.5"/><path d="M3 19c0-3 2-5 4-5s4 2 4 5M13 19c0-3 2-5 4-5s4 2 4 5M8 17c0-3 2-5 4-5s4 2 4 5"/></svg>`,'club','club','fans'],['Comissão',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v3M5 8l2 2M19 8l-2 2"/><circle cx="12" cy="14" r="6"/><path d="M12 11v3l2 2"/></svg>`,'club','club','staff'],['Base',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V11M12 11c0-4 3-6 7-6 0 4-3 6-7 6zM12 14c0-3-2-5-6-5 0 3 2 5 6 5z"/></svg>`,'squad','squad','youth'],['Troféus',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/></svg>`,'club','club','trophy'],['Jornal',`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="15" height="16" rx="1.5"/><path d="M18 8h3v10a2 2 0 0 1-2 2M6 8h9M6 12h9M6 16h6"/></svg>`,'news','news','']];
+/* fundo do card do jogo: foto enviada pelo usuário ou estádio desenhado nas cores do mandante */
+function stadiumArt(t, weather) {
+  const night = weather === 'noite', rain = weather === 'chuva', cloud = weather === 'nublado';
+  const sky = night ? ['#050b1a', '#13213d'] : rain ? ['#4b5563', '#6b7280'] : cloud ? ['#7c8ca3', '#a9b7c9'] : ['#3b82c4', '#9fd0f5'];
+  const a = t.c1, b = t.c2, id = 'sa' + (CRID++);
+  const dots = `<pattern id="${id}" width="8" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.3" fill="${a}"/><circle cx="6" cy="5" r="1.3" fill="${b}"/><circle cx="6" cy="1.5" r="1" fill="#f1e3c8"/><circle cx="2" cy="5.5" r="1" fill="#f1e3c8"/></pattern>`;
+  const lights = night ? [40, 360].map(x => `<rect x="${x - 2}" y="14" width="4" height="70" fill="#2a2f3a"/><rect x="${x - 14}" y="8" width="28" height="10" rx="2" fill="#fff8d6"/><circle cx="${x}" cy="13" r="46" fill="rgba(255,248,214,.18)"/>`).join('') : '';
+  return `<svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>${dots}<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs>
+    <rect width="400" height="220" fill="url(#${id}s)"/>${lights}
+    <path d="M0 60 L400 60 L400 120 L0 120 Z" fill="#2b2f36"/><path d="M0 64 L400 64 L400 118 L0 118 Z" fill="url(#${id})"/>
+    <rect x="0" y="58" width="400" height="5" fill="${b}"/><rect x="0" y="118" width="400" height="8" fill="${a}"/>
+    <path d="M-40 126 L440 126 L470 220 L-70 220 Z" fill="url(#${id})"/><rect x="0" y="126" width="400" height="4" fill="${b}"/>
+    <path d="M30 150 L370 150 L420 220 L-20 220 Z" fill="${night ? '#1d5c33' : '#2f7f42'}"/>
+    <path d="M30 150 L370 150 M200 150 L200 220 M95 220 Q200 175 305 220" stroke="rgba(255,255,255,.55)" stroke-width="1.5" fill="none"/>
+    ${rain ? Array.from({ length: 40 }, (_, i) => `<line x1="${(i * 37) % 400}" y1="${(i * 53) % 200}" x2="${(i * 37) % 400 - 4}" y2="${(i * 53) % 200 + 12}" stroke="rgba(220,230,255,.5)"/>`).join('') : ''}</svg>`;
+}
+function matchInfo(ev) {
+  const it = ev.it, ref = REFS[(S.ci * 7 + S.season * 3) % REFS.length];
+  const days = it.k === 'liga' ? ['Sábado, 16h', 'Sábado, 18h30', 'Domingo, 16h', 'Domingo, 18h30', 'Domingo, 20h30'] : ['Terça, 21h30', 'Quarta, 19h', 'Quarta, 21h30', 'Quinta, 20h'];
+  const when = days[(S.ci * 3 + S.season) % days.length];
+  const host = T(ev.home), fill = clamp(ECON.fill[teamDiv(ev.home)] || .5, .2, 1) + (derbyName(T(ev.home), T(ev.away)) ? .2 : 0);
+  const rnd = it.k === 'liga' ? `${it.r + 1}ª rodada` : CUPS[it.c].stages[it.st];
+  return { ref, when, rnd, crowd: Math.round(Math.min(host.stadium.cap, host.stadium.cap * fill) / 100) * 100 };
+}
 function tilesCard() { return `<div class="card"><span class="label">Central do clube</span><div class="tiles">${TILES.map(([l, ic, t, k, v]) => `<button class="tile" data-act="go" data-t="${t}" data-k="${k}" data-v="${v}">${ic}<span>${l}</span></button>`).join('')}</div></div>`; }
 function preCard() {
   const d = userDiv(), v = Math.round(ECON.start[d] * .25);
@@ -1998,6 +2031,7 @@ function editCard() {
     <div class="field"><span class="label">Cor principal</span>${sw('c1')}</div>
     <div class="field"><span class="label">Cor do detalhe</span>${sw('c2')}</div>
     <div class="field"><span class="label">Desenho da camisa</span>${patPicker(t.pt, 'ept')}</div>
+    <div class="field"><span class="label">Foto do estádio (${esc(t.stadium.name)})</span><div class="btns"><label class="btn small file-btn">Usar foto do celular<input type="file" accept="image/*" class="stad-in" data-id="${t.id}"></label>${t.stadium.photo ? `<button class="btn small" data-act="nophoto" data-id="${t.id}">Voltar ao desenho</button>` : '<span></span>'}</div></div>
     <div class="field"><span class="label">Escudo</span><div class="btns"><label class="btn small file-btn">Usar imagem do celular<input type="file" accept="image/*" id="logo-in"></label>${t.logo ? '<button class="btn small" data-act="nologo">Voltar ao escudo gerado</button>' : '<span></span>'}</div><span class="muted" style="font-size:12px">A imagem fica salva só neste aparelho.</span></div>
     <div class="btns"><button class="btn primary" data-act="esave">Salvar</button><button class="btn" data-act="eclose">Fechar</button></div>
   </div>`;
@@ -2208,6 +2242,8 @@ function stadiumView() {
   return `<div class="card">
     <span class="label">Estádio</span>
     <div class="field"><input type="text" id="stadname" data-act="stadname" maxlength="30" value="${esc(st.name)}" aria-label="Nome do estádio"></div>
+    <div style="position:relative;height:120px;border-radius:10px;overflow:hidden"><div class="st-bg" ${st.photo ? `style="background-image:url(${st.photo})"` : ''}>${st.photo ? '' : stadiumArt(t, 'sol')}</div></div>
+    <div class="btns"><label class="btn small file-btn">Usar foto do celular<input type="file" accept="image/*" class="stad-in" data-id="user"></label>${st.photo ? '<button class="btn small" data-act="nophoto" data-id="user">Voltar ao desenho</button>' : '<span></span>'}</div>
     <div class="row" style="justify-content:space-between"><div><div class="big">${num(st.cap)}</div><span class="muted">lugares · conforto ${st.comfort}</span></div>
       ${S.lastGate ? `<div style="text-align:right"><div><b>${num(S.lastGate.att)}</b> <span class="muted">no último jogo</span></div><div class="muted">renda ${brl(S.lastGate.inc)}</div></div>` : ''}</div>
     <span class="label">Preço do ingresso</span>
@@ -2304,6 +2340,7 @@ document.addEventListener('click', e => {
   else if (a === 'edit') { editId = b.dataset.id; render(); }
   else if (a === 'ecolor') { readEdit(); T(editId)[b.dataset.k] = b.dataset.c; save(); render(true); }
   else if (a === 'ept') { readEdit(); T(editId).pt = v; save(); render(true); }
+  else if (a === 'nophoto') { delete T(b.dataset.id).stadium.photo; save(); render(true); }
   else if (a === 'nologo') { delete T(editId).logo; save(); render(true); }
   else if (a === 'esave') { readEdit(); save(); editId = null; render(); }
   else if (a === 'eclose') { editId = null; render(); }
@@ -2409,6 +2446,11 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target, a = t.dataset.act;
+  if (t.classList && t.classList.contains('stad-in') && t.files && t.files[0]) {
+    const tid = t.dataset.id, fr = new FileReader();
+    fr.onload = () => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'), w = 640, h = Math.round(640 * 9 / 16); c.width = w; c.height = h; const x = c.getContext('2d'), sc = Math.max(w / img.width, h / img.height); x.drawImage(img, (w - img.width * sc) / 2, (h - img.height * sc) / 2, img.width * sc, img.height * sc); T(tid).stadium.photo = c.toDataURL('image/jpeg', .6); save(); render(true); }; img.src = fr.result; };
+    fr.readAsDataURL(t.files[0]); return;
+  }
   if (t.id === 'logo-in' && t.files && t.files[0]) {
     const fr = new FileReader();
     fr.onload = () => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d'); const s = Math.min(96 / img.width, 96 / img.height); x.drawImage(img, (96 - img.width * s) / 2, (96 - img.height * s) / 2, img.width * s, img.height * s); T(editId).logo = c.toDataURL('image/png'); save(); render(true); }; img.src = fr.result; };
@@ -2514,7 +2556,7 @@ function roar() {
 /* ---------- tela da partida ---------- */
 const MX = 16, MY = 26, CW = W + MX * 2, CH = H + MY * 2;
 const cv = $('pitch'), ctx = cv.getContext('2d');
-let M = null, EV = null, US = 0, speed = 1, pauseF = 0, flash = null, raf = 0, scale = 1, replay = null, subSel = null, rain = [];
+let LS = 0, M = null, EV = null, US = 0, speed = 1, pauseF = 0, flash = null, raf = 0, scale = 1, replay = null, subSel = null, rain = [];
 function openMatch() {
   EV = nextEvent();
   const me = T('user'), op = T(EV.opp);
@@ -2525,13 +2567,16 @@ function openMatch() {
   M.onHalf = () => { pauseF = 50; flash = { text: 'INTERVALO', sub: '', side: -1, t: 50 }; whistle('long'); };
   M.onLog = l => { if (l.kind !== 'goal') $('feed').textContent = `${l.min}' ${l.text}`; };
   M.onWhistle = k => whistle(k);
-  $('nU').textContent = me.abbr; $('nD').textContent = op.abbr;
-  $('bU').innerHTML = crest(me, 24); $('bD').innerHTML = crest(op, 24);
+  LS = EV.home === 'user' ? 0 : 1;
+  const tl = M.teams[LS], tr2 = M.teams[1 - LS];
+  $('nU').textContent = tl.abbr; $('nD').textContent = tr2.abbr;
+  $('bU').innerHTML = crest(tl, 24); $('bD').innerHTML = crest(tr2, 24);
   $('end').hidden = true; $('mpanel').hidden = true; $('ctrl').style.visibility = 'visible';
   setSeg('tac', '0'); setSeg('spd', String(speed)); $('sndBtn').setAttribute('aria-pressed', S.sound);
   const wl = WEATHERS.find(w => w[0] === EV.weather)[1];
   const host = T(EV.home), chant = CHANTS[[...host.name].reduce((a, ch) => a + ch.charCodeAt(0), 0) % CHANTS.length].replace('{n}', host.name);
-  $('feed').textContent = `${itemLabel(EV.it)} · ${host.stadium.name} · ${wl}${EV.neutral ? '' : ` · Torcida: "${chant}"`}`;
+  const mi = matchInfo(EV);
+  $('feed').textContent = `${itemLabel(EV.it)} · ${host.stadium.name} · ${wl} · Árbitro: ${mi.ref}${EV.neutral ? '' : ` · Torcida: "${chant}"`}`;
   $('match').hidden = false; $('app').setAttribute('aria-hidden', 'true');
   rain = EV.weather === 'chuva' ? Array.from({ length: 90 }, () => [rnd(0, CW), rnd(0, CH)]) : [];
   pauseF = 30; flash = null; replay = null; lastT = 0; acc = 0; SPR = new Map(); lastSc = lastClk = ''; updateBoard(); resize();
@@ -2566,13 +2611,13 @@ $('mpanel').addEventListener('click', e => {
   if (k === 'in') { const out = M.bodies.find(o => o.side === US && o.p.id === subSel), inP = M.side[US].bench.find(q => q.id === +b.dataset.id); if (out && inP) substitute(M, out, inP); subSel = null; renderSubs(); }
 });
 function statsTable(m) {
-  const s = m.st, tot = s[0].pos + s[1].pos || 1, row = (l, a, b) => `<tr><td><b>${a}</b></td><td>${l}</td><td><b>${b}</b></td></tr>`;
-  return `<table class="stats-t"><tbody><tr><td>${esc(m.teams[0].abbr)}</td><td></td><td>${esc(m.teams[1].abbr)}</td></tr>
+  const L = m === M ? LS : 0, s = [m.st[L], m.st[1 - L]], tot = s[0].pos + s[1].pos || 1, row = (l, a, b) => `<tr><td><b>${a}</b></td><td>${l}</td><td><b>${b}</b></td></tr>`;
+  return `<table class="stats-t"><tbody><tr><td>${esc(m.teams[L].abbr)}</td><td></td><td>${esc(m.teams[1 - L].abbr)}</td></tr>
     ${row('Posse de bola', Math.round(s[0].pos / tot * 100) + '%', Math.round(s[1].pos / tot * 100) + '%')}${row('Finalizações', s[0].shots, s[1].shots)}${row('No gol', s[0].onT, s[1].onT)}
     ${row('Escanteios', s[0].corners, s[1].corners)}${row('Faltas', s[0].fouls, s[1].fouls)}${row('Impedimentos', s[0].offs, s[1].offs)}${row('Amarelos', s[0].yc, s[1].yc)}${row('Vermelhos', s[0].rc, s[1].rc)}</tbody></table>`;
 }
 function updateBoard() {
-  const sc = `${M.score[0]} - ${M.score[1]}`, clk = M.over ? 'Fim' : replay ? 'Replay' : `${Math.min(90, Math.floor(M.t / 40))}'`;
+  const sc = `${M.score[LS]} - ${M.score[1 - LS]}`, clk = M.over ? 'Fim' : replay ? 'Replay' : `${Math.min(90, Math.floor(M.t / 40))}'`;
   if (sc !== lastSc) { $('sc').textContent = sc; lastSc = sc; }
   if (clk !== lastClk) { $('clk').textContent = clk; lastClk = clk; }
 }
@@ -2612,9 +2657,10 @@ function showEnd() {
   $('ctrl').style.visibility = 'hidden'; $('mpanel').hidden = true;
   $('end').innerHTML = `<div class="card" style="max-height:100%;overflow-y:auto">
     <span class="label">${title}</span>
-    <div class="final">${M.score[0]} - ${M.score[1]}</div>
+    <div class="muted" style="font-size:13px">${esc(M.teams[LS].name)} × ${esc(M.teams[1 - LS].name)}</div>
+    <div class="final">${M.score[LS]} - ${M.score[1 - LS]}</div>
     ${r.rec.agg ? `<div class="muted">Agregado: ${T(r.rec.h).abbr} ${r.rec.agg[0]} x ${r.rec.agg[1]} ${T(r.rec.a).abbr}</div>` : ''}
-    ${pens ? `<div><b>Pênaltis: ${home ? r.ures.ph : r.ures.pa} - ${home ? r.ures.pa : r.ures.ph}</b></div>` : ''}
+    ${pens ? `<div><b>Pênaltis: ${r.ures.ph} - ${r.ures.pa}</b></div>` : ''}
     <div class="goals-list">${goals || '<span>Sem gols</span>'}</div>
     ${statsTable(M)}
     ${r.prize ? `<div class="reward"><span class="coin"></span>Prêmio ${brl(r.prize)}</div>` : ''}
