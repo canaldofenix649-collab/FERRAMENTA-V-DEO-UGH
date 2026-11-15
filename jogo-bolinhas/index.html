@@ -938,6 +938,13 @@ const CELEBS = ['corre para a torcida', 'faz o aviãozinho', 'faz uma dancinha',
 const CHANTS = ['Vamos, vamos, {n}! Hoje tem que ganhar!', 'Ô, ô, ô, o {n} é o terror!', 'Dá-lhe, dá-lhe, dá-lhe, {n}!', 'Eu sou {n} até morrer!', 'Ninguém cala esse amor, {n}!', 'Vai pra cima deles, {n}!'];
 const INVESTORS = ['Grupo Bola de Ouro', 'Fundo Gol Investimentos', 'Holding Escanteio', 'Capital Pênalti', 'Rede Arquibancada', 'Consórcio Camisa 10'];
 const REFS = ['Ademir Cabral', 'Rogério Fontana', 'Marcelo Aguiar', 'Cláudia Ventura', 'Edson Bittencourt', 'Wagner Lacerda', 'Paulo Sérgio Tavares', 'Renata Holanda', 'Luiz Carlos Miranda', 'Hélio Damasceno', 'Bruno Esteves', 'Jorge Quintela', 'Sandro Pimentel', 'Fernanda Rocha', 'Otávio Brandão', 'Raul Teixeira'];
+/* veteranos famosos que aceitam jogar no Brasil: [nome, posição, idade, força, último clube] */
+const STARS = [['Casemiro', 'VOL', 34, 82, 'Manchester United'], ['Roberto Firmino', 'CA', 35, 80, 'Al-Ahli'], ['Fabinho', 'VOL', 33, 80, 'Al-Ittihad'], ['Fred', 'VOL', 33, 79, 'Fenerbahçe'],
+  ['Willian', 'PON', 38, 76, 'Fulham'], ['Douglas Costa', 'PON', 36, 77, 'Sydney FC'], ['Allan', 'VOL', 35, 76, 'Al-Wahda'], ['Marquinhos', 'ZAG', 32, 84, 'PSG'],
+  ['Ángel Di María', 'PON', 38, 79, 'Rosario Central'], ['Luis Suárez', 'CA', 39, 78, 'Inter Miami'], ['Antoine Griezmann', 'MEI', 35, 83, 'Atlético de Madrid'],
+  ['Robert Lewandowski', 'CA', 38, 84, 'Barcelona'], ['Luka Modrić', 'MEI', 41, 80, 'Milan'], ['Edinson Cavani', 'CA', 39, 74, 'Boca Juniors'], ['Alex Telles', 'LAT', 33, 77, 'Botafogo']];
+const QUOTES = ['"Não dá para aceitar o que aconteceu", disse um dirigente, que pediu para não ser identificado.', '"O grupo está fechado com o técnico", garantiu o capitão na saída do treino.',
+  '"Vamos levar o caso à CBF e exigir respeito", afirmou o diretor de futebol.', '"Precisamos de paz para trabalhar", resumiu o presidente em entrevista coletiva.', '"A torcida tem razão em cobrar, mas vamos dar a volta por cima", disse o técnico.'];
 const PAPERS = ['Diário da Bola', 'Gazeta do Gol', 'Jornal da Arquibancada', 'O Placar'];
 const PATTERNS = [['', 'Lisa'], ['v', 'Listras'], ['h', 'Listras deitadas'], ['b', 'Faixa'], ['d', 'Faixa diagonal']];
 const KO2 = (n) => [`${n} · ida`, `${n} · volta`];
@@ -1006,7 +1013,7 @@ function value(p) {
   const f = p.age <= 21 ? 1.4 : p.age <= 27 ? 1.15 : p.age <= 31 ? .9 : .55;
   return Math.round(Math.pow(pOvr(p), 2.6) / 40 * f * 3 / 10) * 10;
 }
-const salary = p => Math.round(value(p) / 130);
+const salary = p => Math.round(value(p) / 130 * (p.star ? 3 : 1));
 const ovr = t => Math.round(lineup(t).reduce((a, p) => a + pOvr(p), 0) / 11);
 const staffSalary = (l, d) => Math.round(6 * Math.pow(l, 1.7) * (d ? ECON.mult[d] + .2 : 1));
 
@@ -1063,7 +1070,7 @@ function newCareer(ch) {
 }
 function defaults() {
   return { divisions: Object.assign({ D: [] }, S.divisions), fans: 60, rank: {}, champions: [], prev: null, pre: null, loan: null, ban: 0, saf: null, safOffer: null,
-    election: null, gom: { c: [], vote: null }, cover: null, retireOffer: null, protest: 0, mosaic: false, bids: [], free: [], transfers: [], ask: {}, counter: null, mkMsg: null };
+    election: null, gom: { c: [], vote: null }, cover: null, retireOffer: null, protest: 0, mosaic: false, bids: [], free: [], transfers: [], ask: {}, counter: null, mkMsg: null, stars: [], starsUsed: [], rumors: [] };
 }
 function ensureForeign() {
   S.foreign = S.foreign || {};
@@ -1181,6 +1188,7 @@ function startSeason() {
   setBoard();
   refreshMarket();
   S.staffMarket = genStaffMarket();
+  refreshStars();
   S.pre = null; S.gom = { c: [], vote: null }; S.bids = []; S.counter = null; S.mkMsg = null; S.ask = {};
   S.free = (S.free || []).filter(p => p.age < 36).slice(-20).concat(Array.from({ length: 8 }, () => { const p = makePlayer(rint(52, 74), { age: rint(29, 34), pos: pick(['GOL', 'ZAG', 'LAT', 'VOL', 'MEI', 'PON', 'CA']) }); p.ct = 1; return p; }));
   news(`Começa a temporada ${S.season}. Meta da diretoria: ${S.board.goalText}.`, 'Temporada');
@@ -1210,9 +1218,9 @@ function genStaffMarket() {
   for (const r in STAFF) out[r] = shuffle(STAFF_N).slice(0, 3).map(n => { const l = rint(1, 5); return { name: n, lvl: l, fee: Math.round(staffSalary(l) * 15 / 10) * 10 }; });
   return out;
 }
-function news(text, tag, tid) {
+function news(text, tag, tid, body) {
   if (!tid) { let best = 1e9; for (const id in S.teams) { const n = S.teams[id].name, k = n.length > 3 ? text.indexOf(n) : -1; if (k >= 0 && (k < best || (k === best && id === 'user'))) { best = k; tid = id; } } }
-  S.news.unshift({ s: S.season, when: curLabel(), text, tag, tid: tid || null });
+  S.news.unshift({ s: S.season, when: curLabel(), text, tag, tid: tid || null, body: body || '' });
   if (S.news.length > 220) S.news.length = 220;
 }
 /* notícias do futebol em geral, a cada rodada da liga */
@@ -1227,23 +1235,74 @@ const POLEMICAS = [
   t => `Jogadores do ${t.name} são vistos em festa na véspera do jogo e diretoria abre investigação.`,
   t => `Técnico do ${t.name} é expulso à beira do campo e pode pegar gancho.`,
 ];
+const POSL = { GOL: 'goleiro', ZAG: 'zagueiro', LAT: 'lateral', VOL: 'volante', MEI: 'meia', PON: 'ponta', CA: 'centroavante' };
+const gols = p => Object.values(p.g || {}).reduce((a, b) => a + b, 0);
+function pLine(p) { const g = gols(p); return `${p.name}, ${p.age} anos, ${POSL[p.pos]}${g ? `, ${g} gol${g > 1 ? 's' : ''} na temporada` : ''}`; }
+function tablePos(id) { const d = teamDiv(id); if (!LG.includes(d)) return null; const t = standings(d), i = t.findIndex(x => x.id === id); return i < 0 ? null : { pos: i + 1, pts: t[i].pts, v: t[i].v, e: t[i].e, dr: t[i].dr, d }; }
+function posTxt(id) { const tp = tablePos(id); return tp ? `${tp.pos}º lugar da ${DIVNAME[tp.d]}, com ${tp.pts} pontos` : ''; }
+function makeStar(row) {
+  const [name, pos, age, ov, from] = row, p = makePlayer(ov, { name, pos, age });
+  const k = ov / Math.max(1, pOvr(p)); for (const [a] of ATTRS) p[a] = clamp(Math.round(p[a] * k), 15, 99);
+  p.star = true; p.from = from; p.ct = 2; p.tr = 'idolo'; p.pot = pOvr(p); return p;
+}
+function refreshStars() {
+  S.starsUsed = S.starsUsed || [];
+  const left = STARS.filter(r => !S.starsUsed.includes(r[0]) && !(S.stars || []).some(p => p.name === r[0]));
+  S.stars = (S.stars || []).filter(p => p.age < 40).concat(shuffle(left).slice(0, Math.max(0, 5 - (S.stars || []).length)).map(makeStar));
+}
+function starSigned(p, t, fee) {
+  S.starsUsed.push(p.name); S.stars = S.stars.filter(x => x !== p);
+  const tp = posTxt(t.id);
+  news(`Bomba no mercado: ${t.name} anuncia ${p.name}, ex-${p.from}.`, 'Mercado', t.id,
+    `Aos ${p.age} anos, ${p.name} troca o ${p.from} pelo futebol brasileiro e assina por ${p.ct} temporadas. A operação custou ${brl(fee)} em luvas e o salário, estimado em ${brl(salary(p))} por rodada, é o maior do elenco. ${p.name} chega como ${POSL[p.pos]} titular e a diretoria espera lotar o estádio já na estreia${tp ? `. O ${t.name} ocupa hoje o ${tp}` : ''}.`);
+}
+function aiStarSigning() {
+  if (!S.stars.length || Math.random() > .14) return;
+  const p = pick(S.stars), buyer = T(pick(S.divisions.A.slice(0, 12).filter(id => id !== 'user')));
+  const w = buyer.players.map((q, k) => [q, k]).filter(([q, k]) => k >= 1 && k <= 10 && q.pos === p.pos).sort((a, b) => pOvr(a[0]) - pOvr(b[0]))[0] || [buyer.players[10], 10];
+  const out = w[0]; buyer.players[w[1]] = p; p.num = out.num; moveP(p, null); HI(p).clubs.push(p.from); S.free.push(out); moveP(out, buyer);
+  starSigned(p, buyer, Math.round(value(p) * 1.5 / 10) * 10);
+}
+/* sondagens que viram negociação ou esfriam */
+function rumorTick(r) {
+  S.rumors = (S.rumors || []).filter(x => {
+    if (r - x.r0 < 2) return true;
+    const buyer = T(x.buyer), from = T(x.from), p = findP(from, x.pid);
+    if (!p || !windowOpen()) { news(`Esfriou: ${buyer.name} desiste de ${x.name}.`, 'Rumor', x.buyer, `A diretoria do ${buyer.name} considerou o pedido do ${from.name} alto demais e encerrou as conversas. ${x.name} segue no clube.`); return false; }
+    if (Math.random() < .55) {
+      const fee = Math.round(value(p) * rnd(1.2, 1.6) / 10) * 10, i = from.players.indexOf(p);
+      const w = buyer.players.map((q, k) => [q, k]).filter(([, k]) => k >= 1 && k <= 10).sort((a, b) => pOvr(a[0]) - pOvr(b[0]))[0];
+      const out = w[0]; buyer.players[w[1]] = p; from.players[i] = out; [p.num, out.num] = [out.num, p.num]; moveP(p, from); moveP(out, buyer);
+      logTransfer(p.name, from.name, buyer.name, fee, 'compra');
+      news(`${buyer.name} fecha a contratação de ${p.name}, destaque do ${from.name}.`, 'Mercado', x.buyer,
+        `O negócio foi fechado por ${brl(fee)}. ${pLine(p)}, era um dos principais nomes da ${DIVNAME[teamDiv(x.from)] || 'temporada'} e assina contrato de ${rint(3, 5)} anos. Na negociação, ${out.name} fez o caminho inverso e reforça o ${from.name}. ${buyer.name} ocupa o ${posTxt(x.buyer) || 'meio da tabela'}.`);
+    } else news(`Esfriou: ${buyer.name} não chega a acordo por ${x.name}.`, 'Rumor', x.buyer, `As conversas travaram no valor. O ${from.name} pediu mais de ${brl(Math.round(value(p) * 1.8 / 10) * 10)} e o ${buyer.name} não quis cobrir. ${x.name} fica para a próxima janela.`);
+    return false;
+  });
+}
 function generalNews(r) {
+  rumorTick(r);
+  if (windowOpen()) aiStarSigning();
   const A = S.results.A[r] || [], tbl = standings('A');
   const ovrOf = id => ovr(T(id));
   // resumo e zebras da rodada
   const big = A.filter(x => x.h !== 'user' && x.a !== 'user').sort((x, y) => Math.abs(y.hg - y.ag) - Math.abs(x.hg - x.ag))[0];
-  if (big && Math.abs(big.hg - big.ag) >= 2) news(`Rodada ${r + 1} da Série A: ${T(big.h).name} ${big.hg} x ${big.ag} ${T(big.a).name} foi o placar mais elástico. ${T(tbl[0].id).name} lidera com ${tbl[0].pts} pontos.`, 'Rodada', big.hg > big.ag ? big.h : big.a);
-  for (const x of A) { if (x.h === 'user' || x.a === 'user' || x.hg === x.ag) continue; const w = x.hg > x.ag ? x.h : x.a, l = w === x.h ? x.a : x.h; if (ovrOf(l) - ovrOf(w) >= 7 && Math.random() < .6) { news(`Zebra! ${T(w).name} surpreende e vence o ${T(l).name} por ${Math.max(x.hg, x.ag)} a ${Math.min(x.hg, x.ag)}.`, 'Rodada', w); break; } }
+  if (A.length) news(`Rodada ${r + 1} da Série A: ${big && Math.abs(big.hg - big.ag) >= 2 ? `${T(big.h).name} ${big.hg} x ${big.ag} ${T(big.a).name} foi o placar mais elástico` : `${T(tbl[0].id).name} segue na liderança`}.`, 'Rodada', big ? (big.hg >= big.ag ? big.h : big.a) : tbl[0].id,
+    `Resultados: ${A.map(x => `${T(x.h).abbr} ${x.hg} x ${x.ag} ${T(x.a).abbr}`).join(', ')}. Na tabela, ${tbl.slice(0, 3).map((x, i) => `${T(x.id).name} (${x.pts} pts)`).join(', ')} formam o pódio, enquanto ${tbl.slice(-4).map(x => T(x.id).name).join(', ')} estão na zona de rebaixamento.`);
+  for (const x of A) { if (x.h === 'user' || x.a === 'user' || x.hg === x.ag) continue; const w = x.hg > x.ag ? x.h : x.a, l = w === x.h ? x.a : x.h; if (ovrOf(l) - ovrOf(w) >= 7 && Math.random() < .6) { news(`Zebra! ${T(w).name} surpreende e vence o ${T(l).name} por ${Math.max(x.hg, x.ag)} a ${Math.min(x.hg, x.ag)}.`, 'Rodada', w, `Com elenco considerado inferior (força ${ovrOf(w)} contra ${ovrOf(l)}), o ${T(w).name} jogou ${x.h === w ? 'em casa' : 'fora'} e segurou o resultado. O time agora está em ${posTxt(w) || 'boa fase'}; o ${T(l).name} caiu para ${posTxt(l) || 'a parte de baixo da tabela'}.`); break; } }
   if (r % 5 === 4) { const sc = []; for (const id of S.divisions.A) for (const p of T(id).players) if (p.g && p.g.liga) sc.push([p, id]); sc.sort((a, b) => b[0].g.liga - a[0].g.liga); if (sc[0]) news(`${sc[0][0].name}, do ${T(sc[0][1]).name}, lidera a artilharia da Série A com ${sc[0][0].g.liga} gols.`, 'Rodada', sc[0][1]); }
   // técnico demitido em time da zona
-  if (r >= 6 && Math.random() < .2) { const z = tbl.slice(-4).map(x => x.id).filter(id => id !== 'user'); if (z.length) { const id = pick(z); news(`${T(id).name} demite o técnico depois de ficar na zona de rebaixamento. A diretoria já procura um substituto.`, 'Polêmica', id); T(id).morale = 62; } }
+  if (r >= 6 && Math.random() < .2) { const z = tbl.slice(-4).map(x => x.id).filter(id => id !== 'user'); if (z.length) { const id = pick(z), tp = tablePos(id); news(`${T(id).name} demite o técnico depois de ficar na zona de rebaixamento.`, 'Polêmica', id, `A gota d'água foi a derrota mais recente. A campanha tem ${tp.v} vitórias, ${tp.e} empates e ${tp.dr} derrotas, e o time está em ${tp.pos}º, com ${tp.pts} pontos. O auxiliar assume interinamente enquanto a diretoria procura um nome no mercado. ${pick(QUOTES)}`); T(id).morale = 62; } }
   // polêmicas
-  if (Math.random() < .45) { const pool = tbl.slice(8).map(x => x.id).concat(S.divisions.B.slice(0, 10)).filter(id => id !== 'user'); const id = pick(pool); news(pick(POLEMICAS)(T(id)), 'Polêmica', id); }
+  if (Math.random() < .45) { const pool = tbl.slice(8).map(x => x.id).concat(S.divisions.B.slice(0, 10)).filter(id => id !== 'user'); const id = pick(pool); news(pick(POLEMICAS)(T(id)), 'Polêmica', id, `${pick(QUOTES)} O ${T(id).name} está em ${posTxt(id) || 'meio da tabela'} e a pressão aumenta nos bastidores. A situação deve ser discutida em reunião do conselho nesta semana.`); }
   // boatos de mercado
   if (Math.random() < .35) {
-    const big2 = pick(S.divisions.A.slice(0, 10).filter(id => id !== 'user')), from = pick(LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user' && id !== big2));
+    const big2 = pick(S.divisions.A.filter(id => id !== 'user')), from = pick(LG.slice(1).flatMap(d => S.divisions[d] || []).concat(S.divisions.A.slice(10)).filter(id => id !== 'user' && id !== big2));
     const p = T(from).players.slice(0, 11).sort((a, b) => pOvr(b) - pOvr(a))[0];
-    if (p) news(`Bastidores: ${T(big2).name} sonda ${p.name}, destaque do ${T(from).name}, para a próxima janela.`, 'Rumor', big2);
+    if (p && !(S.rumors || []).some(x => x.pid === p.id)) {
+      (S.rumors = S.rumors || []).push({ buyer: big2, from, pid: p.id, name: p.name, r0: r });
+      news(`Bastidores: ${T(big2).name} sonda ${p.name}, destaque do ${T(from).name}.`, 'Rumor', big2, `${pLine(p)}, chamou a atenção dos olheiros do ${T(big2).name}. O jogador tem contrato por mais ${p.ct} temporada${p.ct > 1 ? 's' : ''} e valor de mercado estimado em ${brl(value(p))}. ${windowOpen() ? 'A expectativa é que haja uma proposta oficial nas próximas rodadas.' : 'A ideia é fazer uma oferta quando a janela abrir.'}`);
+    }
   }
   if (Math.random() < .08) { const id = pick(S.divisions.A.filter(x => x !== 'user')), sp = pick(SPONSORS); T(id).sponsor = sp; news(`${T(id).name} anuncia ${sp} como novo patrocinador master.`, 'Mercado', id); }
 }
@@ -1273,7 +1332,7 @@ function legOf(c, st) { return CUPS[c].legs[st]; }
 function cupPairs(c, st) {
   const cup = S.cups[c];
   if (c === 'est' && st < 7) return cup.rr[st];
-  if (isGroup(c, st)) return cup.groups.flatMap(g => GRP6[st].map(([i, j]) => [g[i], g[j]]));
+  if (isGroup(c, st)) return (cup.groups || []).flatMap(g => GRP6[st].map(([i, j]) => [g[i], g[j]]));
   if (legOf(c, st) === 'v') return (cup.results[st - 1] || []).map(r => [r.a, r.h]);
   const al = cup.alive || [], pairs = [];
   for (let i = 0; i + 1 < al.length; i += 2) pairs.push([al[i], al[i + 1]]);
@@ -1568,7 +1627,8 @@ function aiTransfers() {
   if (pOvr(p) <= pOvr(buyer.players[bi])) return;
   [seller.players[si], buyer.players[bi]] = [buyer.players[bi], seller.players[si]];
   moveP(p, seller); moveP(buyer.players[bi] === p ? seller.players[si] : buyer.players[bi], buyer);
-  news(`${buyer.name} contrata ${p.name}, destaque do ${seller.name}.`, 'Mercado');
+  logTransfer(p.name, seller.name, buyer.name, Math.round(value(p) * 1.2 / 10) * 10, 'compra');
+  news(`${buyer.name} contrata ${p.name}, destaque do ${seller.name}.`, 'Mercado', buyer.id, `${pLine(p)}, deixa a ${DIVNAME[teamDiv(sellerId)] || 'divisão de acesso'} para disputar a Série A. O valor da transferência gira em torno de ${brl(Math.round(value(p) * 1.2 / 10) * 10)}.`);
 }
 function refreshMarket() {
   const pool = LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user');
@@ -1701,7 +1761,7 @@ function takeOver(id) {
 /* =====================================================================
    SALVAR
    ===================================================================== */
-try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; } } catch (e) { S = null; }
+try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); } } catch (e) { S = null; }
 const save = () => { if (!S) return; S.pid = PID; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 /* =====================================================================
@@ -2151,7 +2211,7 @@ function genBids() {
 const loanPrice = p => Math.round(value(p) * .15 / 10) * 10;
 function marketView() {
   const k = sub.mk || 'busca';
-  return seg('sub-mk', k, [['busca', 'Buscar'], ['props', `Vendas${S.bids.length ? ` (${S.bids.length})` : ''}`], ['livres', 'Sem clube'], ['hist', 'Histórico']]) + { busca: searchView, props: salesView, livres: freeView, hist: transfersView }[k]();
+  return seg('sub-mk', k, [['busca', 'Buscar'], ['astros', 'Astros'], ['props', `Vendas${S.bids.length ? ` (${S.bids.length})` : ''}`], ['livres', 'Sem clube'], ['hist', 'Histórico']]).replace('class="seg"', 'class="seg wrap"') + { busca: searchView, astros: starsView, props: salesView, livres: freeView, hist: transfersView }[k]();
 }
 function mkHeader() {
   const u = T('user');
@@ -2194,6 +2254,18 @@ function searchView() {
       <span class="muted" style="font-size:12px">Oferta baixa pode ser recusada ou virar contraproposta. Titulares custam mais, e jogadores de divisões acima podem não querer vir.</span>
     </div>` : ''}`;
   }).join('') || '<span class="muted">Nenhum jogador com esses filtros.</span>'}</div></div>`;
+}
+function starsView() {
+  const u = T('user'), d = userDiv(), canBuy = windowOpen() && !S.ban;
+  const base = { A: .55, B: .25, C: .08, D: .03 }[d];
+  return mkHeader() + `<div class="card"><span class="label">Astros do futebol internacional</span><div class="muted" style="font-size:13px">Veteranos famosos que aceitam jogar no Brasil. Custam caro em luvas e salário (3 vezes o normal), mas trazem público, venda de camisas e manchete. Clubes grandes da Série A também disputam esses jogadores.</div></div>
+  <div class="card"><div class="list">${(S.stars || []).map((p, i) => { const l = Math.round(value(p) * 1.5 / 10) * 10, open = expM === 's' + i;
+    return `<button class="prow" data-act="expM" data-i="s${i}" aria-expanded="${open}"><span class="pnum" style="border-color:var(--amber);color:var(--amber);font-size:10px">${p.pos}</span><span style="min-width:0"><span class="nm">${esc(p.name)} <span class="tag gold">Astro</span></span><br><span class="meta">${p.age} anos · ex-${esc(p.from)} · luvas ${brl(l)}</span></span><span class="ov">${pOvr(p)}</span></button>
+    ${open ? `<div class="expand">${statRows(p, 0, false)}
+      <div class="kv"><span class="muted">Salário pedido</span><b>${brl(salary(p))}/rodada</b></div>
+      <div class="kv"><span class="muted">Chance de aceitar o ${esc(u.name)}</span><span>${base >= .5 ? 'boa' : base >= .2 ? 'média' : 'baixa'}${d !== 'A' ? ` (prefere a Série A)` : ''}</span></div>
+      <div class="btns"><button class="btn small primary" data-act="star" data-i="${i}" data-v="1" ${!canBuy || S.money < l || u.players.length >= MAX_SQ ? 'disabled' : ''}>Oferecer ${brl(l)}</button><button class="btn small" data-act="star" data-i="${i}" data-v="1.3" ${!canBuy || S.money < l * 1.3 || u.players.length >= MAX_SQ ? 'disabled' : ''}>Oferecer ${brl(Math.round(l * 1.3 / 10) * 10)}</button></div></div>` : ''}`;
+  }).join('') || '<span class="muted">Nenhum astro disponível agora. Novos nomes aparecem a cada temporada.</span>'}</div></div>`;
 }
 function salesView() {
   const u = T('user'), listed = u.players.filter(p => p.sale);
@@ -2298,7 +2370,7 @@ function newsView() {
   else if (newsFilter !== 'Todas') list = list.filter(n => secOf(n) === newsFilter);
   list = list.slice(0, 40);
   const ed = S.news.length + (S.season - 1) * 200;
-  const art = (n, lead) => { const h = headOf(n.text), body = n.text.length > h.length + 2 ? n.text : ''; const t = n.tid && S.teams[n.tid];
+  const art = (n, lead) => { const h = headOf(n.text), hh = h.replace(/…$/, ''), k = n.text.indexOf(hh); let rest = k >= 0 && !h.endsWith('…') ? (n.text.slice(0, k) + n.text.slice(k + hh.length)).replace(/^[\s.:!?]*(Bastidores|Esfriou)?[\s.:!?]*/, '').trim() : n.text; const body = [rest, n.body].filter(Boolean).join(' '); const t = n.tid && S.teams[n.tid];
     return lead ? `<div class="lead">${t ? crest(t, 64) : ''}<div><span class="kick">${esc(secOf(n))} · ${esc(n.tag)}</span><h3>${esc(h)}</h3>${body ? `<p class="body">${esc(body)}</p>` : ''}<span class="meta">Temporada ${n.s} · ${esc(n.when)}</span></div></div>`
       : `<div class="art"><div><span class="kick">${esc(secOf(n))}</span><h4>${esc(h)}</h4>${body ? `<p class="body">${esc(body)}</p>` : ''}<span class="meta">T${n.s} · ${esc(n.when)}</span></div>${t ? crest(t, 28) : ''}</div>`; };
   const leadI = Math.max(0, list.findIndex(n => ['Campeão', 'Seu jogo', 'Polêmica', 'Prêmios'].includes(n.tag)));
@@ -2378,6 +2450,14 @@ document.addEventListener('click', e => {
     if (Math.random() < pa) { doBuy(t, p, fee, swapIdx, false); return msg(true, `Negócio fechado: ${p.name} é do ${u.name}!`); }
     if (Math.random() < .5) { S.counter = { tid: t.id, pid: p.id, price: Math.round(ask * rnd(1, 1.12) / 10) * 10, swapIdx }; return msg(false, `O ${t.name} recusou, mas fez uma contraproposta.`); }
     S.ask[p.id] = (S.ask[p.id] || 1) * 1.05; return msg(false, `O ${t.name} recusou a proposta por ${p.name} e subiu a pedida.`);
+  }
+  else if (a === 'star') {
+    const u = T('user'), p = S.stars[i], d = userDiv(), l = Math.round(value(p) * 1.5 * +v / 10) * 10;
+    if (!p || S.money < l || u.players.length >= MAX_SQ || !windowOpen() || S.ban) return;
+    const pa = clamp({ A: .55, B: .25, C: .08, D: .03 }[d] + (S.fans - 50) / 300 + (+v > 1 ? .2 : 0) + (S.titles.length ? .05 : 0), .02, .95);
+    if (Math.random() < pa) { addMoney(-l, 'Contratações'); p.num = nextNum(u); u.players.push(p); moveP(p, null); HI(p).clubs.push(p.from); logTransfer(p.name, p.from, u.name, l, 'astro'); starSigned(p, u, l); S.fans = clamp(S.fans + 10, 0, 100); S.members = Math.round(S.members * 1.05); makeCover('BOMBA!', `${p.name} é do ${u.name}! O ex-${p.from} chega para ser a estrela do time.`, 'user'); S.mkMsg = { ok: true, text: `${p.name} aceitou! Ele é o novo astro do ${u.name}.` }; expM = null; }
+    else { S.mkMsg = { ok: false, text: `${p.name} agradeceu, mas preferiu outra proposta${d !== 'A' ? ' de um clube da Série A' : ''}.` }; if (Math.random() < .3) { const buyer = T(pick(S.divisions.A.slice(0, 12).filter(x => x !== 'user'))); const w = buyer.players[10]; buyer.players[10] = p; p.num = w.num; HI(p).clubs.push(p.from); S.free.push(w); starSigned(p, buyer, Math.round(value(p) * 1.5 / 10) * 10); } }
+    save(); render(true);
   }
   else if (a === 'counterY') { const c = S.counter, t = T(c.tid), p = findP(t, c.pid); if (p && S.money >= c.price && (c.swapIdx != null || T('user').players.length < MAX_SQ)) { doBuy(t, p, c.price, c.swapIdx, false); S.mkMsg = { ok: true, text: `Negócio fechado: ${p.name} é do ${T('user').name}!` }; } S.counter = null; save(); render(true); }
   else if (a === 'counterN') { S.counter = null; S.mkMsg = null; save(); render(true); }
@@ -2498,7 +2578,9 @@ function finishUserMatch(ev, m, userSide) {
   if (leg === 'v') { const ag = aggregate(S.cups[ev.it.c], ev.it.st, rec); rec.agg = [ag.h, ag.a]; }
   S.log.push(rec);
   const res = us > them ? 'vence' : us < them ? 'perde para' : 'empata com';
-  news(`${T('user').name} ${res} o ${T(ev.opp).name}: ${T(ev.home).abbr} ${ures.hg} x ${ures.ag} ${T(ev.away).abbr}${ures.ph != null ? ` (pênaltis ${ures.ph}-${ures.pa})` : ''}.${scorerText(evs, 0)}`, 'Seu jogo');
+  const nxt = (() => { for (let k = S.ci + 1; k < S.cal.length; k++) { const p2 = pairsOf(S.cal[k]).find(x => x.includes('user')); if (p2) return T(p2[0] === 'user' ? p2[1] : p2[0]).name; } return null; })(), st2 = m.st[userSide], tot = m.st[0].pos + m.st[1].pos || 1;
+  news(`${T('user').name} ${res} o ${T(ev.opp).name}: ${T(ev.home).abbr} ${ures.hg} x ${ures.ag} ${T(ev.away).abbr}${ures.ph != null ? ` (pênaltis ${ures.ph}-${ures.pa})` : ''}.${scorerText(evs, 0)}`, 'Seu jogo', 'user',
+    `Jogo válido pela ${label}, no ${T(ev.home).stadium.name}${S.lastGate && home ? `, com público de ${num(S.lastGate.att)} torcedores` : ''}. O ${T('user').name} teve ${Math.round(st2.pos / tot * 100)}% de posse e ${st2.shots} finalizações (${st2.onT} no gol). ${ev.it.k === 'liga' ? `Com o resultado, o time está em ${posTxt('user')}. ` : ''}${nxt ? `O próximo compromisso é contra o ${nxt}.` : ''}`);
   S.ci++;
   advanceAuto();
   save();
