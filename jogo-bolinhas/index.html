@@ -383,11 +383,11 @@ const pOvr = p => { const w = POSW[p.pos] || POSW.MEI; let s = 0; for (const k i
 /* =====================================================================
    MOTOR DA PARTIDA
    ===================================================================== */
-const W = 340, H = 540, GW = 88, PR = 9, BR = 5, FRAMES = 3600, DT = 1 / 60, SC = 1.12;
-const BOX_W = 200, BOX_D = 80, PEN_D = 54;
+const W = 416, H = 660, GW = 96, PR = 10, BR = 5, FRAMES = 3600, DT = 1 / 60, SC = 1.24;
+const BOX_W = 240, BOX_D = 98, PEN_D = 66;
 const RUNW = { LAT: 1.15, PON: 1.18, MEI: 1.1, VOL: 1.05, CA: 1, ZAG: .85 };
 let STA_K = .025;
-let FOUL_P = .2, DEFLECT = .6, SHOT_D = 170, OFF_T = -8;
+let FOUL_P = .2, DEFLECT = .6, SHOT_D = 205, OFF_T = -8;
 const D4 = [[.14,.80],[.38,.84],[.62,.84],[.86,.80]];
 const FORM = {
   '4-4-2':   [...D4, [.14,.62],[.38,.66],[.62,.66],[.86,.62], [.38,.53],[.62,.53]],
@@ -445,10 +445,15 @@ function createMatch(tA, tB, opts) {
     xi.forEach((p, i) => { const b = makeBody(m, s, i, p, f); if (m.derby && p.tr === 'classico') b.base *= 1.06; m.bodies.push(b); });
   });
   m.kits = pickKits(tA, tB, m.home);
+  m.pitch = pitchOf(m.home != null ? [tA, tB][m.home] : null);
+  for (const sd of m.side) sd.drain *= m.pitch.k;
   for (const b of m.bodies) m.played.set(b.p, b);
   kickoff(m);
   return m;
 }
+/* gramado: estádios grandes têm campo maior e cansam mais */
+function pitchOf(t) { const cap = t && t.stadium ? t.stadium.cap : 30000;
+  return cap >= 50000 ? { n: 'grande', dims: '105 × 68 m', k: 1.12 } : cap >= 20000 ? { n: 'médio', dims: '104 × 67 m', k: 1.04 } : { n: 'pequeno', dims: '100 × 64 m', k: .93 }; }
 /* uniformes: o mandante usa o principal; o outro troca para o 2 ou o 3 se as cores ficarem parecidas */
 function kitsOf(t) {
   const lum = h => { const n = parseInt(h.slice(1), 16); return (n >> 16) * .3 + ((n >> 8) & 255) * .59 + (n & 255) * .11; };
@@ -477,7 +482,7 @@ function basePos(m, b) {
 function kickoff(m) {
   for (const b of m.bodies) {
     const p = basePos(m, b);
-    b.x = p.x; b.y = b.side === 0 ? Math.max(p.y, H / 2 + 20) : Math.min(p.y, H / 2 - 20);
+    b.x = p.x; b.y = b.side === 0 ? Math.max(p.y, H / 2 + 24) : Math.min(p.y, H / 2 - 24);
     b.vx = b.vy = 0; b.cd = .3;
   }
   Object.assign(m.ball, { x: W / 2 + rnd(-4, 4), y: H / 2, vx: 0, vy: 0 });
@@ -526,7 +531,7 @@ function kick(m, b, mode) {
     return;
   }
   if (mode === 'corner') {
-    const tx = W / 2 + rnd(-60, 60), ty = g.y - d * rnd(18, 62);
+    const tx = W / 2 + rnd(-72, 72), ty = g.y - d * rnd(22, 76);
     shoot(m, b, tx, ty, clamp(dist(ball, { x: tx, y: ty }) / 1.1, 220, 420), p.pas);
     m.cross = { side: s, until: m.t + 80 }; return;
   }
@@ -541,15 +546,15 @@ function kick(m, b, mode) {
     m.lastShot = { b, t: m.t, kind: 'cabeca', d: dist(ball, g) }; m.st[s].shots++; say(m, `Cabeçada de ${p.name}!`, 'shot'); return;
   }
   const deep = (ball.y - H / 2) * (-d) > H * .28, dg = dist(ball, g);
-  if (mode === 'free' && dg < 210) { shoot(m, b, W / 2 + rnd(-.5, .5) * (GW - 14), g.y, 520, p.chu, 1.1); m.lastShot = { b, t: m.t, kind: 'falta', d: dg }; m.st[s].shots++; say(m, `${p.name} cobra a falta direto!`, 'shot'); return; }
+  if (mode === 'free' && dg < 250) { shoot(m, b, W / 2 + rnd(-.5, .5) * (GW - 14), g.y, 520, p.chu, 1.1); m.lastShot = { b, t: m.t, kind: 'falta', d: dg }; m.st[s].shots++; say(m, `${p.name} cobra a falta direto!`, 'shot'); return; }
   if (b.gk || deep) { shoot(m, b, W / 2 + rnd(-.4, .4) * W, g.y, (225 + p.chu * 3.2) * .85, p.pas); return; }
-  if (!mode && ((dg < SHOT_D && Math.random() < .8) || (dg < 240 && Math.random() < (sd.style === 'posse' ? .05 : .12)))) {
+  if (!mode && ((dg < SHOT_D && Math.random() < .8) || (dg < 290 && Math.random() < (sd.style === 'posse' ? .05 : .12)))) {
     shoot(m, b, W / 2 + rnd(-.5, .5) * (GW - 14), g.y, 225 + p.chu * 3.2, p.chu, 1 + dg / 400); m.lastShot = { b, t: m.t, kind: dg > SHOT_D ? 'longe' : 'chute', d: dg }; m.st[s].shots++;
     if (dg > SHOT_D) say(m, `${p.name} arrisca de longe!`, 'shot'); else if (Math.random() < .5) say(m, `${p.name} finaliza!`, 'shot');
     return;
   }
   const cz = sd.style === 'cruz';
-  if (!mode && Math.abs(ball.x - W / 2) > (cz ? 65 : 85) && Math.abs(ball.y - g.y) < (cz ? 200 : 150) && Math.random() < (cz ? .95 : sd.style === 'posse' ? .45 : .7)) {
+  if (!mode && Math.abs(ball.x - W / 2) > (cz ? 80 : 105) && Math.abs(ball.y - g.y) < (cz ? 240 : 180) && Math.random() < (cz ? .95 : sd.style === 'posse' ? .45 : .7)) {
     const tx = W / 2 + rnd(-55, 55), ty = g.y - d * rnd(20, 70);
     shoot(m, b, tx, ty, clamp(dist(ball, { x: tx, y: ty }) * 1.6, 240, 440) / SC, p.pas, 1.2);
     m.cross = { side: s, until: m.t + 70 }; if (Math.random() < .4) say(m, `${p.name} cruza na área!`, 'cross'); return;
@@ -558,7 +563,7 @@ function kick(m, b, mode) {
   if (fw.length && (Math.random() < (sd.style === 'posse' ? .72 : sd.style === 'contra' ? .6 : .5) || mode)) {
     const deepest = fw.slice().sort((x, y) => (x.y - y.y) * d)[fw.length - 1];
     const o = sd.style === 'contra' || Math.random() < .5 ? deepest : pick(fw);
-    pass(o, clamp(dist(o, ball) / 380, .45, .85)); return;
+    pass(o, clamp(dist(o, ball) / 460, .45, .85)); return;
   }
   if (mode && mates.length) { const o = mates.sort((x, y) => dist(x, ball) - dist(y, ball))[0]; pass(o, .5); return; }
   shoot(m, b, ball.x + rnd(-30, 30), ball.y + d * 120, (225 + p.chu * 3.2) * .5, Math.max(p.dri, p.pas));
@@ -570,7 +575,7 @@ function drift(m) {
     const bp = basePos(m, b), d = ad(b.side);
     let tx = b.gk ? clamp(ball.x, W / 2 - GW / 2 + 8, W / 2 + GW / 2 - 8) : bp.x + (ball.x - W / 2) * .3;
     let ty = b.gk ? bp.y : bp.y + (ball.y - H / 2) * .5;
-    if (sp.type === 'corner' && !b.gk) { const g = ownGoal(1 - sp.side), dd = ad(1 - sp.side); if (Math.abs(b.y - g.y) < 240) { tx = W / 2 - 60 + (b.idx * 37 + b.side * 19) % 120; ty = g.y - dd * (22 + (b.idx * 13 + b.side * 7) % 55); } }
+    if (sp.type === 'corner' && !b.gk) { const g = ownGoal(1 - sp.side), dd = ad(1 - sp.side); if (Math.abs(b.y - g.y) < 240) { tx = W / 2 - 72 + (b.idx * 37 + b.side * 19) % 144; ty = g.y - dd * (26 + (b.idx * 13 + b.side * 7) % 66); } }
     const dx = tx - b.x, dy = ty - b.y, dl = Math.hypot(dx, dy) || 1, v = Math.min(b.base * .6, dl * 3);
     b.vx += (dx / dl * v - b.vx) * k; b.vy += (dy / dl * v - b.vy) * k;
     b.x += b.vx * DT; b.y += b.vy * DT;
@@ -602,7 +607,7 @@ function setPiece(m, type, side, x, y) {
     for (const b of m.bodies) if (b !== taker && !(b.gk && b.side !== side) && inBoxOf(b, 1 - side)) b.y = ownGoal(1 - side).y - d * (BOX_D + 12);
     const gk = opp.find(b => b.gk); if (gk) { gk.x = W / 2; gk.y = ownGoal(1 - side).y - d * 8; }
   } else {
-    for (const b of opp) { const dd = dist(b, ball); if (dd < 36) { const k = 36 / (dd || 1); b.x = clamp(ball.x + (b.x - ball.x) * k, PR, W - PR); b.y = clamp(ball.y + (b.y - ball.y) * k, PR, H - PR); } }
+    for (const b of opp) { const dd = dist(b, ball); if (dd < 42) { const k = 42 / (dd || 1); b.x = clamp(ball.x + (b.x - ball.x) * k, PR, W - PR); b.y = clamp(ball.y + (b.y - ball.y) * k, PR, H - PR); } }
   }
   const tg = type === 'throw' ? { x: W / 2, y: ball.y } : oppGoal(side);
   const ang = Math.atan2(tg.y - ball.y, tg.x - ball.x);
@@ -718,7 +723,7 @@ function step(m) {
     if (b.gk) {
       const og = ownGoal(s);
       if (m.gkDive && m.gkDive.b === b && m.t < m.gkDive.until) { tx = m.gkDive.x; ty = og.y - d * 6; boost = 2.2; }
-      else if (dist(ball, og) < 75 && dist(b, ball) < 55) { tx = ball.x; ty = ball.y; }
+      else if (dist(ball, og) < 90 && dist(b, ball) < 65) { tx = ball.x; ty = ball.y; }
       else { tx = clamp(ball.x, W / 2 - GW / 2 + 8, W / 2 + GW / 2 - 8); ty = og.y + (s === 0 ? -12 : 12) + (s === 0 ? -1 : 1) * clamp(30 - Math.abs(ball.y - og.y) / 10, 0, 12); }
     } else if (r === 'chase') {
       const g = oppGoal(s), gx = g.x - ball.x, gy = g.y - ball.y, gl = Math.hypot(gx, gy) || 1;
@@ -728,8 +733,8 @@ function step(m) {
     } else {
       const bp = basePos(m, b);
       tx = bp.x + (ball.x - W / 2) * .3;
-      ty = bp.y + (ball.y - H / 2) * .5 + d * (m.tactic[s] + (m.side[s].shift || 0)) * 30;
-      if (r === 'support') { tx = ball.x * .5 + bp.x * .5; ty = ball.y + d * 65 + d * m.tactic[s] * 10; }
+      ty = bp.y + (ball.y - H / 2) * .5 + d * (m.tactic[s] + (m.side[s].shift || 0)) * 36;
+      if (r === 'support') { tx = ball.x * .5 + bp.x * .5; ty = ball.y + d * 80 + d * m.tactic[s] * 12; }
       else if (b.idx > 0 && FORM[formOf(m.teams[s])][b.idx - 1][1] < .58 && (ball.y - H / 2) * d < 40) { if (b.offT == null || m.t % 120 === b.idx * 7) b.offT = rnd(OFF_T - 12, OFF_T + 8); const ln = lines[1 - s]; ty = ty * .1 + (ln - d * b.offT) * .9; }
       tx = clamp(tx, PR, W - PR); ty = clamp(ty, PR + 10, H - PR - 10);
     }
@@ -772,8 +777,8 @@ function step(m) {
     }
   }
   const bs = Math.hypot(ball.vx, ball.vy);
-  if (bs > 680) { ball.vx *= 680 / bs; ball.vy *= 680 / bs; }
-  const fr = m.weather === 'chuva' ? .979 : .985;
+  if (bs > 760) { ball.vx *= 760 / bs; ball.vy *= 760 / bs; }
+  const fr = m.weather === 'chuva' ? .983 : .988;
   ball.x += ball.vx * DT; ball.y += ball.vy * DT; ball.vx *= fr; ball.vy *= fr;
   const all = m.bodies;
   for (let i = 0; i < all.length; i++) {
@@ -1945,7 +1950,7 @@ function homeView() {
     <div class="vs">
       ${[T(ev.home), T(ev.away)].map((t, k) => `<div class="side ${t.id === 'user' ? 'you' : ''}">${badge(t, 'lg')}<span class="name">${esc(t.name)}</span><span class="ovr">${k === 0 && !ev.neutral ? 'Mandante · ' : ''}Força ${ovr(t)}</span></div>`).join('<div class="mid">×</div>')}
     </div>
-    <div class="match-info"><span><b>${esc(mi.rnd)}</b></span><span>${esc(mi.when)}</span><span>Árbitro: <b>${esc(mi.ref)}</b></span>${ev.neutral ? '' : `<span>Público esperado: <b>${num(mi.crowd)}</b></span>`}</div>
+    <div class="match-info"><span><b>${esc(mi.rnd)}</b></span><span>${esc(mi.when)}</span><span>Árbitro: <b>${esc(mi.ref)}</b></span>${ev.neutral ? '' : `<span>Público esperado: <b>${num(mi.crowd)}</b></span>`}<span>Gramado: <b>${mi.pitch.n}</b> (${mi.pitch.dims})</span></div>
     <div class="muted" style="text-align:center;font-size:13px">${esc(host.stadium.name)} · ${wl}${aggTxt}${ev.it.k === 'cup' && awayAdv(ev.it.c, ev.it.st) ? ' · jogo único: empate classifica o visitante' : ev.it.k === 'cup' && legOf(ev.it.c, ev.it.st) && legOf(ev.it.c, ev.it.st) !== 'i' ? ' · empate no placar decide nos pênaltis' : ''}</div>
     <div class="btns"><button class="btn primary" data-act="play" ${locked ? 'disabled' : ''}>Jogar partida</button><button class="btn" data-act="quick" ${locked ? 'disabled' : ''}>Simular</button></div>
     ${locked ? '<span class="muted" style="font-size:12px;text-align:center">Escolha o foco da pré-temporada acima para começar.</span>' : ''}
@@ -1974,14 +1979,14 @@ const TILES = [['Escalação',`<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function stadiumArt(t, weather) {
   const night = weather === 'noite', rain = weather === 'chuva', cloud = weather === 'nublado';
   const sky = night ? ['#050b1a', '#13213d'] : rain ? ['#4b5563', '#6b7280'] : cloud ? ['#7c8ca3', '#a9b7c9'] : ['#3b82c4', '#9fd0f5'];
-  const a = t.c1, b = t.c2, id = 'sa' + (CRID++);
+  const a = t.c1, b = t.c2, id = 'sa' + (CRID++), cap = (t.stadium && t.stadium.cap) || 20000, big = cap >= 40000, small = cap < 15000, top = big ? 34 : 60;
   const dots = `<pattern id="${id}" width="8" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.3" fill="${a}"/><circle cx="6" cy="5" r="1.3" fill="${b}"/><circle cx="6" cy="1.5" r="1" fill="#f1e3c8"/><circle cx="2" cy="5.5" r="1" fill="#f1e3c8"/></pattern>`;
   const lights = night ? [40, 360].map(x => `<rect x="${x - 2}" y="14" width="4" height="70" fill="#2a2f3a"/><rect x="${x - 14}" y="8" width="28" height="10" rx="2" fill="#fff8d6"/><circle cx="${x}" cy="13" r="46" fill="rgba(255,248,214,.18)"/>`).join('') : '';
   return `<svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>${dots}<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs>
     <rect width="400" height="220" fill="url(#${id}s)"/>${lights}
-    <path d="M0 60 L400 60 L400 120 L0 120 Z" fill="#2b2f36"/><path d="M0 64 L400 64 L400 118 L0 118 Z" fill="url(#${id})"/>
-    <rect x="0" y="58" width="400" height="5" fill="${b}"/><rect x="0" y="118" width="400" height="8" fill="${a}"/>
-    <path d="M-40 126 L440 126 L470 220 L-70 220 Z" fill="url(#${id})"/><rect x="0" y="126" width="400" height="4" fill="${b}"/>
+    ${small ? `<path d="M0 104 Q100 92 200 100 T400 98 L400 126 L0 126 Z" fill="${night ? '#0d2416' : '#3d6b3a'}"/>` : `<path d="M0 ${top} L400 ${top} L400 120 L0 120 Z" fill="#2b2f36"/><path d="M0 ${top + 4} L400 ${top + 4} L400 118 L0 118 Z" fill="url(#${id})"/>
+    <rect x="0" y="${top - 2}" width="400" height="5" fill="${b}"/><rect x="0" y="118" width="400" height="8" fill="${a}"/>${big ? `<rect x="0" y="76" width="400" height="5" fill="${b}"/><path d="M-20 14 L420 14 L405 ${top - 2} L-5 ${top - 2} Z" fill="#3a3f48"/><rect x="-20" y="12" width="440" height="3" fill="#596070"/>` : ''}`}
+    <path d="M${small ? 20 : -40} ${small ? 140 : 126} L${small ? 380 : 440} ${small ? 140 : 126} L${small ? 400 : 470} 220 L${small ? 0 : -70} 220 Z" fill="url(#${id})"/><rect x="${small ? 20 : 0}" y="${small ? 140 : 126}" width="${small ? 360 : 400}" height="4" fill="${b}"/>
     <path d="M30 150 L370 150 L420 220 L-20 220 Z" fill="${night ? '#1d5c33' : '#2f7f42'}"/>
     <path d="M30 150 L370 150 M200 150 L200 220 M95 220 Q200 175 305 220" stroke="rgba(255,255,255,.55)" stroke-width="1.5" fill="none"/>
     ${rain ? Array.from({ length: 40 }, (_, i) => `<line x1="${(i * 37) % 400}" y1="${(i * 53) % 200}" x2="${(i * 37) % 400 - 4}" y2="${(i * 53) % 200 + 12}" stroke="rgba(220,230,255,.5)"/>`).join('') : ''}</svg>`;
@@ -1992,7 +1997,7 @@ function matchInfo(ev) {
   const when = days[(S.ci * 3 + S.season) % days.length];
   const host = T(ev.home), fill = clamp(ECON.fill[teamDiv(ev.home)] || .5, .2, 1) + (derbyName(T(ev.home), T(ev.away)) ? .2 : 0);
   const rnd = it.k === 'liga' ? `${it.r + 1}ª rodada` : CUPS[it.c].stages[it.st];
-  return { ref, when, rnd, crowd: Math.round(Math.min(host.stadium.cap, host.stadium.cap * fill) / 100) * 100 };
+  return { ref, when, rnd, pitch: pitchOf(ev.neutral ? null : host), crowd: Math.round(Math.min(host.stadium.cap, host.stadium.cap * fill) / 100) * 100 };
 }
 /* ---------- preleção: escalação e tática antes do jogo ---------- */
 let pmSel = null, preMode = false;
@@ -2014,7 +2019,8 @@ function oppScout(id) {
   return { t, form: res.reverse(), stars };
 }
 function tip(me, op, ev) {
-  const a = ovr(me), b = ovr(op), dby = derbyName(me, op), sc = oppScout(op.id);
+  const a = ovr(me), b = ovr(op), dby = derbyName(me, op), sc = oppScout(op.id), pc = pitchOf(ev.neutral ? null : T(ev.home));
+  if (pc.n === 'grande' && ev.home !== 'user') return `O gramado do ${T(ev.home).stadium.name} é grande (${pc.dims}) e cansa mais. Marcação recuada poupa fôlego, e vale fazer as substituições mais cedo.`;
   const att = sc.stars.filter(p => ['CA', 'PON'].includes(p.pos)).length;
   if (dby) return `É ${dby}: o jogo vai ser pegado. Evite um time temperamental em campo e tenha o banco pronto para os cartões.`;
   if (b - a >= 5) return `O ${op.name} é mais forte. Marcação recuada e contra-ataque podem segurar o resultado${ev.home === 'user' ? ', mesmo jogando em casa' : ''}.`;
@@ -2047,6 +2053,7 @@ function preView() {
     <label>Capitão${opt('cap', tac.cap)}</label><label>Pênaltis${opt('pk', tac.pk)}</label><label>Faltas${opt('fk', tac.fk)}</label><label>Escanteios${opt('ck', tac.ck)}</label></div></div>
   <div class="card"><span class="label">Análise do adversário · ${esc(op.name)}</span>
     <div class="kv"><span class="muted">Formação</span><span>${formOf(op)} · força ${ovr(op)}</span></div>
+    <div class="kv"><span class="muted">Gramado</span><span>${(() => { const pc = pitchOf(ev.neutral ? null : T(ev.home)); return `${pc.n} (${pc.dims})${pc.k > 1 ? ` · cansa ${Math.round((pc.k - 1) * 100)}% mais` : pc.k < 1 ? ` · cansa ${Math.round((1 - pc.k) * 100)}% menos` : ""}`; })()}</span></div>
     <div class="kv"><span class="muted">Últimos jogos</span><span>${sc.form.map(x => `<span class="pill ${x === 'V' ? 'w' : x === 'E' ? 'd' : 'l'}">${x}</span>`).join(' ') || '—'}</span></div>
     <div class="kv"><span class="muted">Destaques</span><span style="text-align:right">${sc.stars.map(p => `${esc(p.name)} (${p.pos}, ${pOvr(p)})`).join(', ')}</span></div>
     <div class="muted" style="font-size:13px"><b style="color:var(--amber)">Auxiliar:</b> ${esc(tip(u, op, ev))}</div></div>
@@ -2768,6 +2775,7 @@ function makePreview() {
   const ts = topScorer(me), os = oppScout(op.id).stars[0];
   if (ts && gols(ts)) parts.push(`${ts.name} é o artilheiro do time na temporada, com ${gols(ts)} gol${gols(ts) > 1 ? 's' : ''}.`);
   if (os) parts.push(`No ${op.name}, a atenção é para ${os.name}.`);
+  if (mi.pitch.n === 'grande') parts.push(`O gramado tem ${mi.pitch.dims}, dos maiores do país, e costuma desgastar ${ev.home === 'user' ? 'os visitantes' : 'quem vem de fora'}.`);
   parts.push(`A partida é ${where}, ${mi.when.toLowerCase()}, com arbitragem de ${mi.ref}.`);
   let imp = !!dby;
   if (it.k === 'liga') {
@@ -2877,7 +2885,7 @@ function roar() {
 }
 
 /* ---------- tela da partida ---------- */
-const MX = 16, MY = 26, CW = W + MX * 2, CH = H + MY * 2;
+const MX = 40, MY = 52, CW = W + MX * 2, CH = H + MY * 2;
 const cv = $('pitch'), ctx = cv.getContext('2d');
 let LS = 0, M = null, EV = null, US = 0, speed = 1, pauseF = 0, flash = null, raf = 0, scale = 1, replay = null, subSel = null, rain = [];
 function openMatch() {
@@ -3023,9 +3031,29 @@ function paintKit(c, x, y, r, c1, c2, pt) {
   else if (pt === 'd') { c.translate(x, y); c.rotate(-Math.PI / 4); c.fillRect(-r, -2, 2 * r, 4); }
   c.restore();
 }
+function stands(c, m) {
+  const host = m.home != null ? m.teams[m.home] : m.teams[0], cap = host.stadium ? host.stadium.cap : 30000;
+  const d = teamDiv(host.id), base = LG.includes(d) ? ECON.fill[d] : .55;
+  let fill = base + (m.derby ? .2 : 0) + (m.comp !== 'liga' ? .1 : 0);
+  if (host.id === 'user' && typeof S !== 'undefined' && S) fill += (phase() - .5) * .45 + (S.fans - 50) / 400 - (S.protest > 0 ? .1 : 0);
+  fill = clamp(fill, .12, 1);
+  const depth = 6 + 26 * Math.min(1, cap / 80000), cols = [host.c1, host.c2, '#f1e3c8', host.c1];
+  // blocos: laterais e fundos; estádios grandes fecham os quatro lados, pequenos só têm as laterais
+  const blocks = [[-20 - depth, -30, depth, H + 60], [W + 20, -30, depth, H + 60]];
+  if (cap >= 15000) blocks.push([-20, -30 - depth, W + 40, depth], [-20, H + 30, W + 40, depth]);
+  let seed = 7; const rnd2 = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  for (const [x, y, w, h] of blocks) {
+    c.fillStyle = '#2b2f36'; c.fillRect(x, y, w, h);
+    for (let yy = y + 1.5; yy < y + h; yy += 3.2) for (let xx = x + 1.5; xx < x + w; xx += 3.2) {
+      c.fillStyle = rnd2() < fill ? cols[(rnd2() * cols.length) | 0] : '#3c424c';
+      c.fillRect(xx - .9, yy - .9, 1.8, 1.8);
+    }
+  }
+  if (cap >= 40000) { c.fillStyle = 'rgba(255,255,255,.08)'; for (const [x, y, w, h] of blocks) c.fillRect(x, y, w, Math.min(w, h) === w ? h : 2); }
+}
 function boards(c, m) {
   const host = m.home != null ? m.teams[m.home] : null;
-  const main = (host && host.id === 'user' ? S.sponsor && S.sponsor.name : host ? host.sponsor : 'Mundial de Clubes') || 'Liga das Bolinhas';
+  const main = (host && host.id === 'user' ? S.sponsor && S.sponsor.name : host ? host.sponsor : CUPS[m.comp] ? CUPS[m.comp].name : 'Liga das Bolinhas') || 'Liga das Bolinhas';
   const names = [main, ...SPONSORS.filter(s => s !== main).slice(0, 5)].filter(Boolean);
   const cols = [['#0f3d6e', '#fff'], ['#b8121b', '#fff'], ['#ffd23f', '#111'], ['#111', '#ffd23f'], ['#0b6b3a', '#fff']];
   c.font = '700 8px Rubik, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -3035,9 +3063,9 @@ function boards(c, m) {
     c.save(); c.translate(x + w / 2, y + h / 2); if (rot) c.rotate(rot); c.fillStyle = fg; c.fillText(String(name || '').toUpperCase().slice(0, 22), 0, .5); c.restore();
   };
   const n = 6, hh = (H + 20) / n;
-  for (let i = 0; i < n; i++) { seg(-MX + 2, -10 + i * hh, 10, hh - 2, i, -Math.PI / 2); seg(W + MX - 12, -10 + i * hh, 10, hh - 2, i + 1, Math.PI / 2); }
+  for (let i = 0; i < n; i++) { seg(-16, -10 + i * hh, 10, hh - 2, i, -Math.PI / 2); seg(W + 6, -10 + i * hh, 10, hh - 2, i + 1, Math.PI / 2); }
   const side = (W - GW) / 2 - 10;
-  for (const y of [-MY + 2, H + MY - 12]) { seg(-4, y, side, 10, 0); seg(W / 2 + GW / 2 + 14, y, side, 10, 1); }
+  for (const y of [-26, H + 16]) { seg(-4, y, side, 10, 0); seg(W / 2 + GW / 2 + 14, y, side, 10, 1); }
 }
 /* fundo fixo (placas, gramado, linhas, luz): desenhado uma vez por partida ou redimensionamento */
 function buildBg(m) {
@@ -3047,6 +3075,7 @@ function buildBg(m) {
   c.setTransform(k, 0, 0, k, 0, 0);
   c.fillStyle = night ? '#050c0f' : '#0a181c'; c.fillRect(0, 0, CW, CH);
   c.translate(MX, MY);
+  stands(c, m);
   boards(c, m);
   for (const gy of [-12, H]) {
     c.fillStyle = 'rgba(255,255,255,.14)'; c.fillRect(W / 2 - GW / 2, gy, GW, 12);
@@ -3061,14 +3090,14 @@ function buildBg(m) {
   c.strokeStyle = 'rgba(255,255,255,.82)'; c.fillStyle = 'rgba(255,255,255,.82)'; c.lineWidth = 2;
   c.strokeRect(1, 1, W - 2, H - 2);
   c.beginPath(); c.moveTo(0, H / 2); c.lineTo(W, H / 2); c.stroke();
-  c.beginPath(); c.arc(W / 2, H / 2, 46, 0, 7); c.stroke();
+  c.beginPath(); c.arc(W / 2, H / 2, 56, 0, 7); c.stroke();
   c.beginPath(); c.arc(W / 2, H / 2, 2.5, 0, 7); c.fill();
   for (const top of [true, false]) {
     const y0 = top ? 0 : H, sg = top ? 1 : -1;
     c.strokeRect(W / 2 - BOX_W / 2, top ? 1 : H - BOX_D, BOX_W, BOX_D - 1);
-    c.strokeRect(W / 2 - 50, top ? 1 : H - 28, 100, 27);
+    c.strokeRect(W / 2 - 60, top ? 1 : H - 33, 120, 32);
     c.beginPath(); c.arc(W / 2, y0 + sg * PEN_D, 2, 0, 7); c.fill();
-    c.beginPath(); c.arc(W / 2, y0 + sg * BOX_D, 22, top ? 0 : Math.PI, top ? Math.PI : 0); c.stroke();
+    c.beginPath(); c.arc(W / 2, y0 + sg * BOX_D, 26, top ? 0 : Math.PI, top ? Math.PI : 0); c.stroke();
   }
   c.fillStyle = '#fff';
   for (const px of [W / 2 - GW / 2, W / 2 + GW / 2]) for (const py of [0, H]) { c.beginPath(); c.arc(px, py, 3, 0, 7); c.fill(); }
