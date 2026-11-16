@@ -16,6 +16,7 @@ let hoje = "";
 let abaAtual = "caixa";
 let papel = null; // "dono" ou "barbeiro"
 let eu = null;    // { id, nome } quando é barbeiro
+let ambiente = "local"; // "cloudflare" ou "local"
 const ABAS_BARBEIRO = ["caixa", "meus"];
 
 // ---------- API ----------
@@ -152,7 +153,7 @@ async function iniciar() {
   const e = await api("/estado");
   hoje = e.hoje;
   if (!e.logado) return mostrarEntrada(e);
-  papel = e.papel; eu = e.eu;
+  papel = e.papel; eu = e.eu; ambiente = e.ambiente || "local";
   await recarregarBase();
   $("#tela-entrada").hidden = true;
   $("#app").hidden = false;
@@ -215,10 +216,15 @@ const novo = { tipo: "service", colab: null, servicos: [], forma: "cash", client
 ABAS.caixa = async (el) => {
   const ativos = base.colaboradores.filter((c) => c.ativo);
   if (!novo.colab || !ativos.some((c) => c.id === novo.colab)) novo.colab = ativos[0]?.id || null;
-  el.innerHTML = `<div class="grade">
+  const diasSemBackup = base.ultimo_backup ? Math.round((new Date(hoje) - new Date(base.ultimo_backup)) / 864e5) : null;
+  const lembrete = papel === "dono" && (diasSemBackup == null || diasSemBackup >= 7)
+    ? `<section class="cartao" id="lembrete-backup" style="border-color:var(--ouro);margin-bottom:16px"><div class="linha entre"><span>${diasSemBackup == null ? "Você ainda não baixou nenhum backup." : `Faz ${diasSemBackup} dias que você não baixa um backup.`} Leva poucos segundos.</span><button class="btn primario pequeno" id="lembrete-baixar">Baixar backup</button></div></section>`
+    : "";
+  el.innerHTML = `${lembrete}<div class="grade">
     <section class="cartao" id="novo-lanc"></section>
     <div class="pilha"><section class="cartao" id="hoje-resumo"></section><section class="cartao" id="hoje-lista"></section></div>
   </div>`;
+  $("#lembrete-baixar")?.addEventListener("click", (e) => baixarBackup(e.currentTarget));
   desenharNovo();
   await atualizarHoje();
 };
@@ -645,7 +651,7 @@ ABAS.planos = async (el) => {
 const pLanc = { chave: "semana", de: "", ate: "", tipo: "", colab: "" };
 ABAS.lancamentos = async (el) => {
   if (!pLanc.de) [pLanc.de, pLanc.ate] = periodo("semana");
-  el.innerHTML = `<div class="pilha"><div class="linha entre"><h2>Lançamentos</h2><a class="btn pequeno" href="/api/exportar/transacoes.csv">Baixar tudo em planilha (CSV)</a></div>
+  el.innerHTML = `<div class="pilha"><div class="linha entre"><h2>Lançamentos</h2><button class="btn pequeno" id="lanc-csv">Baixar tudo em planilha (CSV)</button></div>
     <div class="linha">${seletorPeriodo("per-lanc", pLanc)}
       <select id="f-tipo" style="width:auto"><option value="">Todos os tipos</option>${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${pLanc.tipo === k ? "selected" : ""}>${v}</option>`).join("")}</select>
       <select id="f-colab" style="width:auto">${opcoesColabs("Todos os barbeiros", true).map(([v, t]) => `<option value="${v}" ${pLanc.colab === v ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>
@@ -656,6 +662,7 @@ ABAS.lancamentos = async (el) => {
     ligarApagar($("#lanc-lista"), desenhar);
   };
   ligarPeriodo("per-lanc", pLanc, desenhar);
+  $("#lanc-csv").onclick = (e) => baixarPlanilha(e.currentTarget);
   $("#f-tipo").onchange = (e) => { pLanc.tipo = e.target.value; desenhar(); };
   $("#f-colab").onchange = (e) => { pLanc.colab = e.target.value; desenhar(); };
   await desenhar();
@@ -720,19 +727,87 @@ ABAS.cadastros = async (el) => {
 };
 
 // ======================= DADOS E AJUSTES =======================
+/** Lê uma tabela inteira do servidor, 1000 linhas por vez. */
+async function lerTabela(tabela, aoAvancar) {
+  const todas = [];
+  let depois = 0;
+  while (true) {
+    const r = await api(`/dados?tabela=${tabela}&depois=${depois}`);
+    todas.push(...r.linhas);
+    aoAvancar?.(todas.length);
+    if (r.proximo == null) return todas;
+    depois = r.proximo;
+  }
+}
+function salvarArquivo(nome, conteudo, tipo) {
+  const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: nome });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+async function baixarBackup(btn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  try {
+    const cab = await api("/dados/config");
+    const tabelas = {};
+    for (const t of cab.tabelas) tabelas[t] = await lerTabela(t, (n) => (btn.textContent = `Lendo ${t}… ${n}`));
+    salvarArquivo(`backup-barbearia-${hoje}.json`, JSON.stringify({ app: cab.app, versao: cab.versao, gerado_em: cab.gerado_em, config: cab.config, tabelas }), "application/json");
+    await post("/backup/feito");
+    base.ultimo_backup = hoje;
+    $("#lembrete-backup")?.remove();
+    aviso("Backup baixado. Guarde no Google Drive ou mande para o seu e-mail.");
+  } catch (e) { aviso(e.message, true); } finally { btn.disabled = false; btn.textContent = original; }
+}
+async function baixarPlanilha(btn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  try {
+    const linhas = await lerTabela("transacoes", (n) => (btn.textContent = `Lendo… ${n}`));
+    const nomeCli = new Map(base.clientes.map((c) => [c.id, c.nome]));
+    const nomeCol = new Map(base.colaboradores.map((c) => [c.id, c.nome]));
+    linhas.sort((a, b) => a.data_hora.localeCompare(b.data_hora));
+    const cols = ["data_hora", "tipo", "categoria", "descricao", "valor", "comissao", "forma_pagamento", "taxa_pct", "taxa_valor", "cliente", "colaborador", "id"];
+    const csv = (v) => (v == null ? "" : /[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+    const texto = "\uFEFF" + [cols.join(","), ...linhas.map((l) => cols.map((c) => csv(c === "cliente" ? nomeCli.get(l.cliente_id) : c === "colaborador" ? nomeCol.get(l.colaborador_id) : l[c])).join(","))].join("\n");
+    salvarArquivo(`lancamentos-${hoje}.csv`, texto, "text/csv");
+  } catch (e) { aviso(e.message, true); } finally { btn.disabled = false; btn.textContent = original; }
+}
+
+const ORDEM_IMPORTACAO = ["colaboradores.csv", "clientes.csv", "servicos.csv", "produtos.csv", "transacoes.csv", "caixa.csv", "fiados.csv", "contas-a-pagar.csv", "planos-clientes.csv", "metas.csv", "agendamentos.csv"];
+const NOMES_IMPORTACAO = { "colaboradores.csv": "barbeiros", "clientes.csv": "clientes", "servicos.csv": "serviços", "produtos.csv": "produtos", "transacoes.csv": "lançamentos", "caixa.csv": "dias de caixa", "fiados.csv": "fiados", "contas-a-pagar.csv": "contas a pagar", "planos-clientes.csv": "planos de clientes", "metas.csv": "metas", "agendamentos.csv": "agendamentos" };
+const LOTE = 300;
+
+/** Envia uma lista em partes, mostrando o progresso no botão. */
+async function enviarEmPartes(btn, rotulo, lista, enviar) {
+  let feitos = 0;
+  for (let i = 0; i < lista.length; i += LOTE) {
+    btn.textContent = `${rotulo}… ${Math.round((feitos / Math.max(1, lista.length)) * 100)}%`;
+    await enviar(lista.slice(i, i + LOTE));
+    feitos += Math.min(LOTE, lista.length - i);
+  }
+}
+
 ABAS.ajustes = async (el) => {
-  const bk = await api("/backups");
+  const nuvem = ambiente === "cloudflare";
+  const bk = nuvem ? { lista: [] } : await api("/backups").catch(() => ({ lista: [] }));
   const t = base.taxas;
   el.innerHTML = `<div class="grade">
     <section class="cartao"><h2>Trazer dados do app antigo</h2>
-      <p class="sutil">Envie o arquivo <b>.zip</b> exportado do app antigo (o mesmo com transacoes.csv, clientes.csv etc.). Pode enviar de novo depois com uma exportação mais nova: nada é duplicado, e o que você lançou aqui não é apagado. Um backup é feito antes.</p>
+      <p class="sutil">Envie o arquivo <b>.zip</b> exportado do app antigo (o que tem transacoes.csv, clientes.csv etc.). Se enviar de novo com uma exportação mais nova, nada é duplicado, e o que você lançou aqui não é apagado.</p>
       <input type="file" id="imp-arquivo" accept=".zip,.csv" multiple>
       <button class="btn primario largo" id="imp-enviar" style="margin-top:10px">Importar</button>
       <div id="imp-resultado"></div></section>
     <section class="cartao"><h2>Backup</h2>
-      <p class="sutil">O app faz um backup automático por dia (guarda os 60 mais recentes) na pasta <code>${esc(bk.pasta)}</code>. Guarde também uma cópia fora do computador (pen drive, Google Drive).</p>
-      <div class="linha"><a class="btn primario" href="/api/backup/baixar">Baixar backup agora</a><a class="btn" href="/api/exportar/transacoes.csv">Planilha de lançamentos (CSV)</a></div>
-      <details style="margin-top:12px"><summary class="sutil">Backups salvos (${bk.lista.length})</summary><ul class="pequeno-txt">${bk.lista.slice(0, 30).map((b) => `<li>${esc(b.arquivo)} <span class="sutil">${(b.tamanho / 1024).toFixed(0)} KB</span></li>`).join("")}</ul></details></section>
+      <p class="sutil">${nuvem
+        ? "O Cloudflare guarda sozinho todas as alterações dos últimos 7 dias. Além disso, baixe uma cópia completa toda semana e guarde fora do celular (Google Drive ou e-mail). O app avisa quando passar de 7 dias."
+        : `O app faz um backup automático por dia (guarda os 60 mais recentes) na pasta <code>${esc(bk.pasta || "")}</code>. Guarde também uma cópia fora do computador.`}</p>
+      <p class="pequeno-txt sutil">Último backup baixado: <b>${base.ultimo_backup ? dataBR(base.ultimo_backup) : "nunca"}</b></p>
+      <div class="linha"><button class="btn primario" id="bk-baixar">Baixar backup agora</button><button class="btn" id="bk-csv">Planilha de lançamentos (CSV)</button></div>
+      ${nuvem ? "" : `<details style="margin-top:12px"><summary class="sutil">Backups automáticos (${bk.lista.length})</summary><ul class="pequeno-txt">${bk.lista.slice(0, 30).map((b) => `<li><a href="/api/backups/${encodeURIComponent(b.arquivo)}" style="color:var(--ouro-2)">${esc(b.arquivo)}</a> <span class="sutil">${(b.tamanho / 1024).toFixed(0)} KB</span></li>`).join("")}</ul></details>`}
+      <details style="margin-top:8px"><summary class="sutil">Restaurar um backup (.json)</summary>
+        <p class="sutil pequeno-txt">Traz de volta tudo o que está no arquivo: o que foi apagado volta, e o que é igual fica como está. Os lançamentos feitos depois do backup não são apagados.</p>
+        <input type="file" id="rest-arquivo" accept=".json"><button class="btn largo" id="rest-enviar" style="margin-top:8px">Restaurar</button></details></section>
     <section class="cartao"><h2>Taxas da maquininha</h2>
       <p class="sutil pequeno-txt">Descontadas automaticamente em cada lançamento (aparecem como saída "Taxa").</p>
       <form id="f-taxas"><div class="campos">
@@ -744,28 +819,62 @@ ABAS.ajustes = async (el) => {
       <form id="f-nome"><label>Nome da barbearia<input name="nome" value="${esc(base.nome)}"></label><button class="btn">Salvar nome</button></form>
       <form id="f-senha" style="margin-top:16px"><div class="campos">
         <label>Senha atual<input name="senha_atual" type="password" autocomplete="current-password"></label>
-        <label>Nova senha<input name="nova_senha" type="password" minlength="4" autocomplete="new-password"></label>
+        <label>Nova senha<input name="nova_senha" type="password" minlength="6" autocomplete="new-password"></label>
       </div><button class="btn">Trocar senha</button></form></section>
   </div>`;
+
+  $("#bk-baixar").onclick = (e) => baixarBackup(e.currentTarget);
+  $("#bk-csv").onclick = (e) => baixarPlanilha(e.currentTarget);
   $("#imp-enviar").onclick = async () => {
-    const arquivos = [...$("#imp-arquivo").files];
-    if (!arquivos.length) return aviso("Escolha o arquivo .zip", true);
+    const escolhidos = [...$("#imp-arquivo").files];
+    if (!escolhidos.length) return aviso("Escolha o arquivo .zip", true);
     const btn = $("#imp-enviar");
-    btn.disabled = true; btn.textContent = "Importando…";
+    btn.disabled = true;
     try {
-      let r;
-      if (arquivos.length === 1 && arquivos[0].name.toLowerCase().endsWith(".zip")) {
-        r = await api("/importar", { method: "POST", body: await arquivos[0].arrayBuffer(), headers: { "Content-Type": "application/zip" } });
-      } else {
-        const mapa = {};
-        for (const f of arquivos) mapa[f.name] = await f.text();
-        r = await api("/importar", { method: "POST", body: JSON.stringify(mapa), headers: { "Content-Type": "application/json" } });
+      const { lerZip, lerCsv } = await import("/zipcsv.js");
+      let arquivos = {};
+      for (const f of escolhidos) {
+        if (f.name.toLowerCase().endsWith(".zip")) Object.assign(arquivos, await lerZip(await f.arrayBuffer()));
+        else arquivos[f.name] = await f.text();
+      }
+      const presentes = ORDEM_IMPORTACAO.filter((n) => arquivos[n]);
+      if (!presentes.length) throw new Error("Não achei os arquivos do app antigo (transacoes.csv, clientes.csv…) dentro do que foi enviado.");
+      const totais = {}, criados = {};
+      for (const nome of presentes) {
+        const linhas = lerCsv(arquivos[nome]);
+        totais[NOMES_IMPORTACAO[nome]] = 0;
+        await enviarEmPartes(btn, `Importando ${NOMES_IMPORTACAO[nome]}`, linhas, async (parte) => {
+          const r = await post("/importar/lote", { arquivo: nome, linhas: parte });
+          totais[NOMES_IMPORTACAO[nome]] += r.total;
+          for (const [k, v] of Object.entries(r.criados || {})) criados[k] = (criados[k] || 0) + v;
+        });
       }
       await recarregarBase();
-      $("#imp-resultado").innerHTML = `<p class="pos" style="margin-top:12px"><b>Importação concluída.</b></p><ul class="pequeno-txt">${Object.entries(r.importado).map(([k, v]) => `<li>${esc(k)}: <b>${v}</b></li>`).join("")}</ul><p class="sutil pequeno-txt">Backup de antes da importação: ${esc(r.backup)}</p>`;
+      $("#imp-resultado").innerHTML = `<p class="pos" style="margin-top:12px"><b>Importação concluída.</b></p><ul class="pequeno-txt">${Object.entries({ ...totais, ...criados }).map(([k, v]) => `<li>${esc(k)}: <b>${v}</b></li>`).join("")}</ul>`;
       aviso("Dados importados!");
     } catch (e) { aviso(e.message, true); } finally { btn.disabled = false; btn.textContent = "Importar"; }
   };
+
+  $("#rest-enviar").onclick = async () => {
+    const f = $("#rest-arquivo").files[0];
+    if (!f) return aviso("Escolha o arquivo de backup (.json)", true);
+    const btn = $("#rest-enviar");
+    btn.disabled = true;
+    try {
+      let bkp;
+      try { bkp = JSON.parse(await f.text()); } catch { throw new Error("Esse arquivo não é um backup válido."); }
+      if (bkp?.app !== "gestao-barbearia" || !bkp.tabelas) throw new Error("Esse arquivo não é um backup deste app.");
+      if (!confirmar(`Restaurar o backup de ${bkp.gerado_em}?`)) return;
+      await post("/restaurar/lote", { config: bkp.config || [] });
+      let total = 0;
+      for (const [tabela, linhas] of Object.entries(bkp.tabelas)) {
+        await enviarEmPartes(btn, `Restaurando ${tabela}`, linhas || [], async (parte) => { total += (await post("/restaurar/lote", { tabela, linhas: parte })).total; });
+      }
+      await recarregarBase();
+      aviso(`Backup restaurado (${total} registros)`);
+    } catch (e) { aviso(e.message, true); } finally { btn.disabled = false; btn.textContent = "Restaurar"; }
+  };
+
   const salvarCfg = (sel, montar, msg) => ($(sel).onsubmit = async (e) => {
     e.preventDefault();
     await tentar(async () => { await post("/config", montar(e.target)); await recarregarBase(); aviso(msg); });

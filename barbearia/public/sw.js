@@ -1,7 +1,7 @@
 // Service worker: permite instalar como aplicativo e abre a tela mesmo com internet ruim.
 // Os dados (/api) sempre vêm do servidor, nunca do cache.
-const CACHE = "barbearia-v2";
-const ARQUIVOS = ["/", "/index.html", "/app.js", "/style.css", "/icone.svg", "/manifest.webmanifest"];
+const CACHE = "barbearia-v3";
+const ARQUIVOS = ["/", "/index.html", "/app.js", "/style.css", "/icone.svg", "/manifest.webmanifest", "/zipcsv.js"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
 });
