@@ -24,22 +24,42 @@ function confereSenha(senha, salvo) {
   return crypto.timingSafeEqual(crypto.scryptSync(senha, Buffer.from(sal, "hex"), esperado.length), esperado);
 }
 const hashToken = (t) => crypto.createHash("sha256").update(t).digest("hex");
-function criarSessao(res) {
+const TRUST_PROXY = process.env.TRUST_PROXY === "1";
+const httpsDe = (req) => TRUST_PROXY && String(req.headers["x-forwarded-proto"] || "").startsWith("https");
+const ipDe = (req) => (TRUST_PROXY && String(req.headers["x-forwarded-for"] || "").split(",")[0].trim()) || req.socket.remoteAddress;
+
+function criarSessao(req, res, colaboradorId = null) {
   const token = crypto.randomBytes(32).toString("hex");
-  db.prepare("INSERT INTO sessoes (token_hash, expira) VALUES (?, ?)").run(hashToken(token), Date.now() + SESSAO_DIAS * 864e5);
-  res.setHeader("Set-Cookie", `sessao=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSAO_DIAS * 86400}`);
+  db.prepare("INSERT INTO sessoes (token_hash, expira, colaborador_id) VALUES (?, ?, ?)").run(hashToken(token), Date.now() + SESSAO_DIAS * 864e5, colaboradorId);
+  res.setHeader("Set-Cookie", `sessao=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSAO_DIAS * 86400}${httpsDe(req) ? "; Secure" : ""}`);
 }
 function tokenDo(req) {
   const m = /(?:^|;\s*)sessao=([a-f0-9]{64})/.exec(req.headers.cookie || "");
   return m ? m[1] : null;
 }
-function logado(req) {
+/** Quem está usando: null (ninguém), { dono: true } ou { dono: false, colab }. */
+function quem(req) {
   const t = tokenDo(req);
-  if (!t) return false;
-  const s = db.prepare("SELECT expira FROM sessoes WHERE token_hash = ?").get(hashToken(t));
-  return !!s && s.expira > Date.now();
+  if (!t) return null;
+  const s = db.prepare("SELECT expira, colaborador_id FROM sessoes WHERE token_hash = ?").get(hashToken(t));
+  if (!s || s.expira <= Date.now()) return null;
+  if (!s.colaborador_id) return { dono: true };
+  const colab = db.prepare("SELECT id, nome, pct_comissao, ativo, pin_hash FROM colaboradores WHERE id = ?").get(s.colaborador_id);
+  if (!colab || !colab.ativo || !colab.pin_hash) return null; // desativado ou PIN removido: perde o acesso
+  return { dono: false, colab };
 }
+// Proteção contra chute de senha/PIN: por IP e por conta.
 const tentativas = new Map();
+function checarBloqueio(chave) {
+  const t = tentativas.get(chave);
+  if (t && t.ate > Date.now()) throw new Erro(429, "Muitas tentativas. Espere alguns minutos e tente de novo.");
+}
+function registrarFalha(chave, limite, minutos) {
+  const t = tentativas.get(chave) || { n: 0, ate: 0 };
+  t.n++;
+  if (t.n >= limite) { t.n = 0; t.ate = Date.now() + minutos * 60_000; }
+  tentativas.set(chave, t);
+}
 
 // ---------- utilidades HTTP ----------
 class Erro extends Error {
@@ -82,6 +102,14 @@ const OBRIGATORIO = { clientes: "nome", colaboradores: "nome", servicos: "nome",
 function salvarCadastro(tabela, dados) {
   const cfg = CADASTROS[tabela];
   const valores = {};
+  if (tabela === "colaboradores") {
+    const pin = String(dados.pin ?? "").trim();
+    if (dados.remover_pin) valores.pin_hash = null;
+    else if (pin) {
+      if (!/^\d{4,6}$/.test(pin)) throw new Erro(400, "O PIN precisa ter de 4 a 6 números.");
+      valores.pin_hash = hashSenha(pin);
+    }
+  }
   for (const c of cfg.campos) {
     if (!(c in dados)) continue;
     let v = dados[c];
@@ -121,13 +149,13 @@ function lancar(t) {
   const data_hora = t.data_hora || agoraBrasilia();
   const pct = t.tipo === "service" || t.tipo === "income" ? Number(taxas()[t.forma_pagamento] || 0) : 0;
   const taxa = r2((t.valor * pct) / 100);
-  db.prepare(`INSERT INTO transacoes (id,data_hora,tipo,categoria,descricao,valor,comissao,forma_pagamento,taxa_pct,taxa_valor,cliente_id,colaborador_id,produto_id,vinculo_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+  db.prepare(`INSERT INTO transacoes (id,data_hora,tipo,categoria,descricao,valor,comissao,forma_pagamento,taxa_pct,taxa_valor,cliente_id,colaborador_id,produto_id,vinculo_id,lancado_por)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(id, data_hora, t.tipo, t.categoria ?? null, t.descricao ?? null, r2(t.valor), r2(t.comissao), t.forma_pagamento ?? null,
-      pct || null, taxa, t.cliente_id ?? null, t.colaborador_id ?? null, t.produto_id ?? null, t.vinculo_id ?? null);
+      pct || null, taxa, t.cliente_id ?? null, t.colaborador_id ?? null, t.produto_id ?? null, t.vinculo_id ?? null, t.lancado_por ?? null);
   if (taxa > 0) {
-    db.prepare(`INSERT INTO transacoes (id,data_hora,tipo,categoria,descricao,valor,forma_pagamento,taxa_pct,vinculo_id) VALUES (?,?,'expense','taxa',?,?,?,?,?)`)
-      .run(uuid(), data_hora, `Taxa ${NOME_TAXA[t.forma_pagamento]} (${String(pct).replace(".", ",")}%)`, taxa, t.forma_pagamento, pct, id);
+    db.prepare(`INSERT INTO transacoes (id,data_hora,tipo,categoria,descricao,valor,forma_pagamento,taxa_pct,vinculo_id,lancado_por) VALUES (?,?,'expense','taxa',?,?,?,?,?,?)`)
+      .run(uuid(), data_hora, `Taxa ${NOME_TAXA[t.forma_pagamento]} (${String(pct).replace(".", ",")}%)`, taxa, t.forma_pagamento, pct, id, t.lancado_por ?? null);
   }
   return id;
 }
@@ -158,7 +186,7 @@ function novoLancamento(d) {
       if (!(valorCobrado > 0)) throw new Erro(400, "Digite o valor do fiado.");
       return { fiado: salvarCadastro("fiados", { cliente_id: d.cliente_id, colaborador_id: colab.id, valor: valorCobrado, descricao: nomes || d.descricao }) };
     }
-    return { id: lancar({ tipo, descricao, valor: valorCobrado, comissao, forma_pagamento: forma, cliente_id: d.cliente_id || null, colaborador_id: colab.id }) };
+    return { id: lancar({ tipo, descricao, valor: valorCobrado, comissao, forma_pagamento: forma, cliente_id: d.cliente_id || null, colaborador_id: colab.id, lancado_por: d.lancado_por }) };
   }
   if (tipo === "commission") {
     if (!colab) throw new Erro(400, "Escolha o colaborador.");
@@ -293,6 +321,61 @@ function exportarCsv() {
   return "﻿" + [cols.join(","), ...linhas.map((l) => cols.map((c) => esc(l[c])).join(","))].join("\n");
 }
 
+// ---------- área do barbeiro ----------
+// O barbeiro só lança os próprios serviços, vê os próprios números e apaga
+// o que ele mesmo lançou no dia (para corrigir erro). O resto é só do dono.
+function resumoBarbeiro(colabId, de, ate) {
+  const p = [de + " 00:00", ate + " 23:59", colabId];
+  const g = db.prepare(`SELECT
+      COUNT(CASE WHEN tipo='service' THEN 1 END) cortes,
+      COUNT(CASE WHEN tipo='service' AND forma_pagamento='plan' THEN 1 END) cortes_plano,
+      COALESCE(SUM(CASE WHEN tipo='service' THEN valor END),0) faturado,
+      COALESCE(SUM(CASE WHEN tipo IN ('service','commission','income') THEN comissao END),0) comissao,
+      COALESCE(SUM(CASE WHEN tipo='expense' AND categoria='comissao_paga' THEN valor END),0) pago
+    FROM transacoes WHERE data_hora BETWEEN ? AND ? AND colaborador_id = ?`).get(...p);
+  const lista = db.prepare(`SELECT t.id, t.data_hora, t.tipo, t.categoria, t.descricao, t.valor, t.comissao, t.forma_pagamento, t.lancado_por, c.nome cliente
+    FROM transacoes t LEFT JOIN clientes c ON c.id = t.cliente_id
+    WHERE t.data_hora BETWEEN ? AND ? AND t.colaborador_id = ? ORDER BY t.data_hora DESC, t.rowid DESC LIMIT 2000`).all(...p);
+  return { de, ate, cortes: g.cortes, cortes_plano: g.cortes_plano, faturado: r2(g.faturado), comissao: r2(g.comissao), pago: r2(g.pago), saldo: r2(g.comissao - g.pago), lista };
+}
+
+async function apiBarbeiro(req, res, rota, m, q, colab) {
+  const hoje = hojeBrasilia();
+  if (rota === "/base" && m === "GET") {
+    return json(res, 200, {
+      colaboradores: [{ id: colab.id, nome: colab.nome, pct_comissao: colab.pct_comissao, ativo: 1 }],
+      servicos: db.prepare(`SELECT id, nome, preco, pct_comissao, ativo FROM servicos WHERE ativo = 1 ORDER BY nome COLLATE NOCASE`).all(),
+      produtos: [],
+      clientes: db.prepare("SELECT id, nome FROM clientes ORDER BY nome COLLATE NOCASE").all(),
+      planos: db.prepare("SELECT id, cliente_id, plano, servicos_inclusos, cortes_maximos FROM planos WHERE status='active'").all(),
+      nome: getConfig("nome_barbearia", "Minha Barbearia"),
+    });
+  }
+  if (rota === "/meu" && m === "GET") return json(res, 200, resumoBarbeiro(colab.id, q.de || hoje, q.ate || q.de || hoje));
+  if (rota === "/transacoes" && m === "POST") {
+    const d = await corpoJson(req);
+    if (d.tipo !== "service") throw new Erro(403, "Só o dono lança entradas e saídas.");
+    // ignora qualquer outro barbeiro/comissão enviados: vale sempre quem está logado e a tabela de preços
+    const limpo = { tipo: "service", servicos: d.servicos, forma_pagamento: d.forma_pagamento, cliente_id: d.cliente_id, valor: d.valor, colaborador_id: colab.id, lancado_por: colab.id };
+    return json(res, 200, transacao(() => novoLancamento(limpo)));
+  }
+  const mt = /^\/transacoes\/([\w-]+)$/.exec(rota);
+  if (mt && m === "DELETE") {
+    const t = db.prepare("SELECT * FROM transacoes WHERE id = ?").get(mt[1]);
+    if (!t || t.lancado_por !== colab.id || t.data_hora.slice(0, 10) !== hoje) throw new Erro(403, "Você só pode apagar o que você mesmo lançou hoje. Para outros casos, fale com o dono.");
+    transacao(() => {
+      db.prepare("DELETE FROM transacoes WHERE vinculo_id = ?").run(t.id);
+      db.prepare("DELETE FROM transacoes WHERE id = ?").run(t.id);
+    });
+    return json(res, 200, { ok: true });
+  }
+  if (rota === "/clientes" && m === "POST") {
+    const d = await corpoJson(req);
+    return json(res, 200, { id: salvarCadastro("clientes", { nome: d.nome, telefone: d.telefone }) });
+  }
+  throw new Erro(403, "Essa área é só do dono.");
+}
+
 // ---------- rotas ----------
 async function api(req, res, url) {
   const m = req.method;
@@ -300,7 +383,15 @@ async function api(req, res, url) {
   const q = Object.fromEntries(url.searchParams);
 
   if (rota === "/estado" && m === "GET") {
-    return json(res, 200, { configurado: !!getConfig("senha"), logado: logado(req), nome: getConfig("nome_barbearia", "Minha Barbearia"), hoje: hojeBrasilia() });
+    const u = quem(req);
+    return json(res, 200, {
+      configurado: !!getConfig("senha"), logado: !!u, papel: u ? (u.dono ? "dono" : "barbeiro") : null,
+      eu: u && !u.dono ? { id: u.colab.id, nome: u.colab.nome } : null,
+      nome: getConfig("nome_barbearia", "Minha Barbearia"), hoje: hojeBrasilia(),
+      // barbeiros que podem entrar (só o primeiro nome, para a tela de entrada)
+      acessos: db.prepare("SELECT id, nome FROM colaboradores WHERE ativo = 1 AND pin_hash IS NOT NULL ORDER BY nome COLLATE NOCASE").all()
+        .map((c) => ({ id: c.id, nome: c.nome.trim().split(/\s+/)[0] })),
+    });
   }
   if (rota === "/senha/criar" && m === "POST") {
     if (getConfig("senha")) throw new Erro(400, "A senha já foi criada.");
@@ -308,22 +399,34 @@ async function api(req, res, url) {
     if (!senha || String(senha).length < 4) throw new Erro(400, "A senha precisa ter pelo menos 4 caracteres.");
     setConfig("senha", hashSenha(String(senha)));
     if (nome) setConfig("nome_barbearia", String(nome).trim());
-    criarSessao(res);
+    criarSessao(req, res);
     return json(res, 200, { ok: true });
   }
   if (rota === "/login" && m === "POST") {
-    const ip = req.socket.remoteAddress;
-    const t = tentativas.get(ip) || { n: 0, ate: 0 };
-    if (t.ate > Date.now()) throw new Erro(429, "Muitas tentativas. Espere um minuto.");
-    const { senha } = await corpoJson(req);
-    if (!confereSenha(String(senha || ""), getConfig("senha"))) {
-      t.n++;
-      if (t.n >= 5) { t.n = 0; t.ate = Date.now() + 60_000; }
-      tentativas.set(ip, t);
-      throw new Erro(401, "Senha incorreta.");
+    const ip = ipDe(req);
+    checarBloqueio("ip:" + ip);
+    const { senha, colaborador_id } = await corpoJson(req);
+    if (colaborador_id) {
+      // entrada do barbeiro com PIN
+      checarBloqueio("colab:" + colaborador_id);
+      const c = db.prepare("SELECT id, pin_hash, ativo FROM colaboradores WHERE id = ?").get(String(colaborador_id));
+      if (!c || !c.ativo || !c.pin_hash || !confereSenha(String(senha || ""), c.pin_hash)) {
+        registrarFalha("ip:" + ip, 5, 1);
+        registrarFalha("colab:" + colaborador_id, 8, 15);
+        throw new Erro(401, "PIN incorreto.");
+      }
+      tentativas.delete("colab:" + colaborador_id);
+      criarSessao(req, res, c.id);
+    } else {
+      checarBloqueio("dono");
+      if (!confereSenha(String(senha || ""), getConfig("senha"))) {
+        registrarFalha("ip:" + ip, 5, 1);
+        registrarFalha("dono", 10, 15);
+        throw new Erro(401, "Senha incorreta.");
+      }
+      criarSessao(req, res);
     }
-    tentativas.delete(ip);
-    criarSessao(res);
+    tentativas.delete("ip:" + ip);
     return json(res, 200, { ok: true });
   }
   if (rota === "/logout" && m === "POST") {
@@ -333,11 +436,14 @@ async function api(req, res, url) {
     return json(res, 200, { ok: true });
   }
 
-  if (!logado(req)) throw new Erro(401, "Entre com a senha.");
+  const u = quem(req);
+  if (!u) throw new Erro(401, "Entre de novo.");
+  if (!u.dono) return apiBarbeiro(req, res, rota, m, q, u.colab);
 
   if (rota === "/base" && m === "GET") {
     return json(res, 200, {
-      colaboradores: db.prepare(`SELECT * FROM colaboradores ORDER BY ${CADASTROS.colaboradores.ordem}`).all(),
+      colaboradores: db.prepare(`SELECT * FROM colaboradores ORDER BY ${CADASTROS.colaboradores.ordem}`).all()
+        .map(({ pin_hash, ...c }) => ({ ...c, tem_pin: !!pin_hash })),
       servicos: db.prepare(`SELECT * FROM servicos ORDER BY ${CADASTROS.servicos.ordem}`).all(),
       produtos: db.prepare(`SELECT * FROM produtos ORDER BY ${CADASTROS.produtos.ordem}`).all(),
       clientes: db.prepare("SELECT id, nome, telefone FROM clientes ORDER BY nome COLLATE NOCASE").all(),

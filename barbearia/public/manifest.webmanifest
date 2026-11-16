@@ -1,9 +1,17 @@
 {
   "name": "Gestão da Barbearia",
   "short_name": "Barbearia",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#14110f",
   "theme_color": "#14110f",
-  "icons": [{ "src": "/icone.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "icons": [
+    { "src": "/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icone.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
 }

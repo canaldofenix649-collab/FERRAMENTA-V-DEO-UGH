@@ -88,6 +88,15 @@ db.exec(`
   );
 `);
 
+// Migrações: colunas novas em bancos já existentes.
+function garantirColuna(tabela, coluna, def) {
+  const cols = db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name);
+  if (!cols.includes(coluna)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${def}`);
+}
+garantirColuna("colaboradores", "pin_hash", "TEXT");          // PIN de acesso do barbeiro ao app
+garantirColuna("sessoes", "colaborador_id", "TEXT");          // NULL = dono; preenchido = barbeiro
+garantirColuna("transacoes", "lancado_por", "TEXT");          // NULL = dono/importado; id do barbeiro que lançou
+
 export function getConfig(chave, padrao = null) {
   const r = db.prepare("SELECT valor FROM config WHERE chave = ?").get(chave);
   return r ? r.valor : padrao;

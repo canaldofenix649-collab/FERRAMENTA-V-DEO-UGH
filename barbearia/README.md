@@ -23,9 +23,41 @@ npm run importar -- caminho/dados-barbearia.zip
 
 A importação pode ser repetida com uma exportação mais nova: os registros mantêm o mesmo código do app antigo, então nada é duplicado, e o que foi lançado no sistema novo continua intacto. Antes de cada importação, o sistema faz um backup.
 
-### Usar no celular dos barbeiros
+## Barbeiros usando pelo celular
 
-Com o computador ligado e o sistema aberto, os celulares **na mesma rede Wi-Fi** acessam pelo IP do computador, por exemplo `http://192.168.0.10:3100`. Para descobrir o IP no Windows, rode `ipconfig` e veja "Endereço IPv4". No celular, use "Adicionar à tela inicial" para o sistema aparecer como um aplicativo.
+### 1. Dar acesso a cada barbeiro
+
+Entre como dono e vá em **Cadastros → Barbeiros → Editar**. Defina um **PIN** de 4 a 6 números para cada barbeiro. Na tela de entrada, ele toca no próprio nome e digita o PIN.
+
+| O barbeiro pode | O barbeiro **não** pode |
+|---|---|
+| Lançar os próprios cortes (dinheiro, PIX, cartão, plano, fiado) | Lançar em nome de outro barbeiro |
+| Ver o próprio dia, a comissão e quanto falta receber | Ver o caixa geral, o lucro, os colegas, as contas e os backups |
+| Cadastrar cliente novo (nome e telefone) | Lançar entradas e saídas |
+| Apagar o que **ele mesmo** lançou **hoje** (para corrigir erro) | Apagar lançamento antigo ou de outra pessoa |
+
+O dono vê tudo o que os barbeiros lançam, na hora. Para tirar o acesso de alguém, marque "Tirar o acesso dele ao app" ou desative o barbeiro. Ele sai na mesma hora.
+
+### 2. Instalar como aplicativo
+
+Abra o endereço do sistema no celular:
+- **Android (Chrome):** menu ⋮ → **Instalar app** (ou "Adicionar à tela inicial").
+- **iPhone (Safari):** botão de compartilhar → **Adicionar à Tela de Início**.
+
+O ícone da tesoura aparece na tela inicial, e o sistema abre em tela cheia, como um aplicativo. Cada celular lembra quem entrou por último.
+
+### 3. Onde o sistema fica rodando
+
+**Opção A: só no Wi-Fi da barbearia (grátis).** O computador da barbearia fica ligado com o `iniciar.bat` aberto. Os celulares conectados ao mesmo Wi-Fi acessam pelo IP do computador, por exemplo `http://192.168.0.10:3100`. Para descobrir o IP no Windows, rode `ipconfig` e veja "Endereço IPv4". O limite dessa opção é que, se o computador desligar ou o celular sair do Wi-Fi, o app para de funcionar.
+
+**Opção B: na internet (recomendado, cerca de US$ 5 por mês).** O app funciona em qualquer lugar, inclusive no 4G, e não depende do computador. Exemplo com o **Railway** (railway.app):
+
+1. Crie uma conta e escolha **New Project → Deploy from GitHub repo**. Escolha este repositório e, em Settings, defina **Root Directory = `barbearia`**. O Railway usa o `Dockerfile` da pasta.
+2. Em **Volumes**, crie um volume montado em **`/data`**. É ali que ficam os dados. **Sem o volume, os dados se perdem a cada atualização.**
+3. Em **Settings → Networking**, gere o domínio público. Você recebe um endereço `https://...up.railway.app`.
+4. Abra o endereço, crie a senha do dono e importe o .zip em **Dados e ajustes**.
+
+Funciona do mesmo jeito no Render ou no Fly.io, desde que haja um disco persistente montado em `/data`. Mesmo com o app na internet, baixe um backup de vez em quando em **Dados e ajustes**.
 
 ## O que tem
 

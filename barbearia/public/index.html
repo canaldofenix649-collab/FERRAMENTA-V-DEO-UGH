@@ -8,6 +8,9 @@
   <title>Gestão da Barbearia</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icone.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icone-180.png" />
+  <meta name="apple-mobile-web-app-title" content="Barbearia" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -17,9 +20,10 @@
       <img src="/icone.svg" alt="" width="56" height="56" />
       <h1 id="entrada-titulo">Gestão da Barbearia</h1>
       <p id="entrada-texto" class="sutil"></p>
+      <div id="entrada-quem"></div>
       <form id="form-entrada">
         <label id="campo-nome" hidden>Nome da barbearia<input name="nome" autocomplete="organization" /></label>
-        <label>Senha<input name="senha" type="password" autocomplete="current-password" required minlength="4" /></label>
+        <label id="rotulo-senha">Senha<input name="senha" type="password" autocomplete="current-password" required minlength="4" /></label>
         <button class="btn primario largo" type="submit" id="btn-entrada">Entrar</button>
         <p class="erro" id="erro-entrada"></p>
       </form>
@@ -30,10 +34,11 @@
   <div id="app" hidden>
     <header class="topo">
       <div class="marca"><img src="/icone.svg" alt="" width="28" height="28" /><span id="nome-barbearia"></span></div>
-      <button class="btn fantasma pequeno" id="btn-sair">Sair</button>
+      <div class="linha"><span class="sutil" id="quem-sou"></span><button class="btn fantasma pequeno" id="btn-sair">Sair</button></div>
     </header>
     <nav class="abas" id="abas">
       <button data-aba="caixa" class="ativa">Caixa</button>
+      <button data-aba="meus" hidden>Meus números</button>
       <button data-aba="painel">Painel</button>
       <button data-aba="comissoes">Comissões</button>
       <button data-aba="clientes">Clientes</button>
@@ -51,5 +56,8 @@
   <dialog id="dialogo"><form method="dialog" id="dialogo-form"></form></dialog>
 
   <script src="/app.js" type="module"></script>
+  <script>
+    if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  </script>
 </body>
 </html>

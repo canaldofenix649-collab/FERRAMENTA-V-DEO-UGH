@@ -14,6 +14,9 @@ const TIPOS = { service: "Serviço", income: "Entrada", expense: "Saída", commi
 let base = null; // colaboradores, serviços, clientes, produtos, taxas
 let hoje = "";
 let abaAtual = "caixa";
+let papel = null; // "dono" ou "barbeiro"
+let eu = null;    // { id, nome } quando é barbeiro
+const ABAS_BARBEIRO = ["caixa", "meus"];
 
 // ---------- API ----------
 async function api(caminho, opcoes = {}) {
@@ -24,7 +27,7 @@ async function api(caminho, opcoes = {}) {
   }
   const r = await fetch("/api" + caminho, o);
   const dados = await r.json().catch(() => ({}));
-  if (r.status === 401 && caminho !== "/login") { mostrarEntrada(true); throw new Error(dados.erro || "Entre de novo."); }
+  if (r.status === 401 && caminho !== "/login") { iniciar(); throw new Error(dados.erro || "Entre de novo."); }
   if (!r.ok) throw new Error(dados.erro || "Algo deu errado.");
   return dados;
 }
@@ -127,6 +130,7 @@ function campoHtml(c) {
     const sel = new Set(c.valor || []);
     return `<div style="grid-column:1/-1"><label>${esc(c.rotulo)}</label><div class="chips">${c.opcoes.map(([val, txt]) => `<label class="chip" style="margin:0"><input type="checkbox" name="${c.nome}" value="${esc(val)}" ${sel.has(val) ? "checked" : ""}>${esc(txt)}</label>`).join("")}</div></div>`;
   }
+  if (c.tipo === "pin") return `<label${largo}>${esc(c.rotulo)}<input name="${c.nome}" type="password" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" autocomplete="new-password"></label>`;
   return `<label${largo}>${esc(c.rotulo)}<input name="${c.nome}" type="${c.tipo || "text"}" value="${esc(v)}" ${c.tipo === "number" ? 'step="0.01" inputmode="decimal"' : ""} ${c.obrigatorio ? "required" : ""}></label>`;
 }
 function confirmar(msg) { return window.confirm(msg); }
@@ -147,37 +151,57 @@ async function recarregarBase() {
 async function iniciar() {
   const e = await api("/estado");
   hoje = e.hoje;
-  if (!e.logado) return mostrarEntrada(e.configurado);
+  if (!e.logado) return mostrarEntrada(e);
+  papel = e.papel; eu = e.eu;
   await recarregarBase();
   $("#tela-entrada").hidden = true;
   $("#app").hidden = false;
+  $$("#abas button").forEach((b) => (b.hidden = papel === "barbeiro" ? !ABAS_BARBEIRO.includes(b.dataset.aba) : b.dataset.aba === "meus"));
+  $("#quem-sou").textContent = eu ? primeiroNome(eu.nome) : "";
   abrirAba(location.hash.slice(1) || "caixa");
 }
-function mostrarEntrada(configurado) {
+let estadoEntrada = null, entradaComo = null; // null = dono; id = barbeiro
+try { entradaComo = localStorage.getItem("entrada_como") || null; } catch {}
+function mostrarEntrada(e) {
+  if (e && typeof e === "object") estadoEntrada = e;
+  const est = estadoEntrada || { configurado: true, acessos: [] };
   $("#app").hidden = true;
   $("#tela-entrada").hidden = false;
-  $("#campo-nome").hidden = configurado;
-  $("#entrada-texto").textContent = configurado ? "Digite a senha para entrar." : "Primeiro acesso: crie a senha que vai proteger os dados da barbearia.";
-  $("#btn-entrada").textContent = configurado ? "Entrar" : "Criar senha e entrar";
+  const acessos = est.configurado ? est.acessos || [] : [];
+  if (entradaComo && !acessos.some((a) => a.id === entradaComo)) entradaComo = null;
+  $("#entrada-quem").innerHTML = acessos.length
+    ? `<p class="sutil">Quem está entrando?</p><div class="chips" style="justify-content:center">${acessos.map((a) => `<button type="button" class="chip ${entradaComo === a.id ? "sel" : ""}" data-quem="${a.id}">${esc(a.nome)}</button>`).join("")}<button type="button" class="chip ${entradaComo ? "" : "sel"}" data-quem="">Dono</button></div>`
+    : "";
+  $$("[data-quem]").forEach((b) => (b.onclick = () => { entradaComo = b.dataset.quem || null; mostrarEntrada(); $("#form-entrada").senha.focus(); }));
+  const campo = $("#form-entrada").senha;
+  $("#campo-nome").hidden = est.configurado;
+  $("#rotulo-senha").firstChild.textContent = entradaComo ? "Seu PIN" : est.configurado ? "Senha do dono" : "Crie a senha do dono";
+  campo.inputMode = entradaComo ? "numeric" : "text";
+  campo.autocomplete = entradaComo ? "off" : "current-password";
+  $("#entrada-texto").textContent = est.configurado ? "" : "Primeiro acesso: crie a senha do dono. Ela protege todos os dados da barbearia.";
+  $("#btn-entrada").textContent = est.configurado ? "Entrar" : "Criar senha e entrar";
   $("#form-entrada").onsubmit = async (ev) => {
     ev.preventDefault();
     const f = ev.target;
     $("#erro-entrada").textContent = "";
     try {
-      if (configurado) await post("/login", { senha: f.senha.value });
-      else await post("/senha/criar", { senha: f.senha.value, nome: f.nome.value });
+      if (!est.configurado) await post("/senha/criar", { senha: f.senha.value, nome: f.nome.value });
+      else {
+        await post("/login", { senha: f.senha.value, colaborador_id: entradaComo });
+        try { entradaComo ? localStorage.setItem("entrada_como", entradaComo) : localStorage.removeItem("entrada_como"); } catch {}
+      }
       f.reset();
       iniciar();
     } catch (err) { $("#erro-entrada").textContent = err.message; }
   };
 }
-$("#btn-sair").onclick = async () => { await post("/logout"); location.hash = ""; iniciar(); };
+$("#btn-sair").onclick = async () => { await post("/logout"); history.replaceState(null, "", "/"); iniciar(); };
 
 // ---------- abas ----------
 const ABAS = {};
 $("#abas").onclick = (e) => { const b = e.target.closest("button[data-aba]"); if (b) abrirAba(b.dataset.aba); };
 function abrirAba(nome) {
-  if (!ABAS[nome]) nome = "caixa";
+  if (!ABAS[nome] || (papel === "barbeiro" && !ABAS_BARBEIRO.includes(nome)) || (papel === "dono" && nome === "meus")) nome = "caixa";
   abaAtual = nome;
   history.replaceState(null, "", "#" + nome);
   $$("#abas button").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === nome));
@@ -212,7 +236,7 @@ function desenharNovo() {
   if (novo.tipo === "service") {
     const total = calcTotal();
     const planoCliente = novo.cliente && base.planos.find((p) => p.cliente_id === novo.cliente);
-    corpo = `${colabChips()}
+    corpo = `${papel === "dono" ? colabChips() : ""}
       <label>Serviços (toque para somar)</label>
       <div class="chips" id="ch-serv">${servs.map((s) => { const n = novo.servicos.filter((x) => x === s.id).length; return `<button class="chip ${n ? "sel" : ""}" data-id="${s.id}">${esc(s.nome)}${n > 1 ? ` ×${n}` : ""}<small>${brl(s.preco)}</small></button>`; }).join("")}</div>
       ${novo.servicos.length ? `<button class="btn fantasma pequeno" id="limpar-serv">Limpar serviços</button>` : ""}
@@ -236,7 +260,7 @@ function desenharNovo() {
       <button class="btn primario largo" id="n-lancar">Lançar saída</button>`;
   }
   el.innerHTML = `<div class="linha entre"><h2>Novo lançamento</h2></div>
-    <div class="chips">${tipoBtn("service", "Corte / serviço")}${tipoBtn("income", "Entrada / venda")}${tipoBtn("expense", "Saída")}</div>${corpo}`;
+    ${papel === "dono" ? `<div class="chips">${tipoBtn("service", "Corte / serviço")}${tipoBtn("income", "Entrada / venda")}${tipoBtn("expense", "Saída")}</div>` : ""}${corpo}`;
 
   $$("[data-tipo]", el).forEach((b) => (b.onclick = () => { novo.tipo = b.dataset.tipo; novo.forma = "cash"; novo.valorEditado = false; desenharNovo(); }));
   $$("#ch-colab .chip", el).forEach((b) => (b.onclick = () => { novo.colab = b.dataset.id; desenharNovo(); }));
@@ -286,6 +310,7 @@ async function lancarNovo() {
 }
 
 async function atualizarHoje() {
+  if (papel === "barbeiro") return atualizarHojeBarbeiro();
   const [res, lista, cx] = await Promise.all([api(`/resumo?de=${hoje}&ate=${hoje}`), api(`/transacoes?de=${hoje}&sem_taxas=1`), api("/caixa")]);
   const g = res.geral;
   const caixaTxt = !cx.caixa
@@ -315,10 +340,46 @@ function linhaLanc(t) {
   const sinal = t.tipo === "expense" ? "neg" : t.tipo === "commission" ? "" : "pos";
   const valor = t.tipo === "commission" ? `+${brl(t.comissao)} com.` : (t.tipo === "expense" ? "−" : "") + brl(t.valor);
   const desc = t.descricao || (t.tipo === "service" ? "Serviço" : TIPOS[t.tipo]);
-  const det = [t.colaborador && primeiroNome(t.colaborador), t.cliente, FORMAS[t.forma_pagamento], t.comissao && t.tipo !== "commission" ? "comissão " + brl(t.comissao) : ""].filter(Boolean).join(" · ");
+  const det = [papel === "dono" && t.colaborador && primeiroNome(t.colaborador), t.cliente, FORMAS[t.forma_pagamento], t.comissao && t.tipo !== "commission" ? "comissão " + brl(t.comissao) : ""].filter(Boolean).join(" · ");
   return `<div class="lanc"><span class="hora">${t.data_hora.slice(11)}</span><div class="info"><div>${esc(desc)}</div><div class="sutil pequeno-txt">${esc(det)}</div></div>
-    <span class="num ${sinal}">${valor}</span><button class="btn fantasma pequeno perigo" data-apagar="${t.id}" title="Apagar">✕</button></div>`;
+    <span class="num ${sinal}">${valor}</span>${podeApagar(t) ? `<button class="btn fantasma pequeno perigo" data-apagar="${t.id}" title="Apagar">✕</button>` : ""}</div>`;
 }
+function podeApagar(t) {
+  if (papel === "dono") return true;
+  return !!eu && t.lancado_por === eu.id && t.data_hora.slice(0, 10) === hoje;
+}
+async function atualizarHojeBarbeiro() {
+  const r = await api(`/meu?de=${hoje}`);
+  $("#hoje-resumo").innerHTML = `<h2>Seu dia · ${dataBR(hoje)}</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="rot">Cortes</div><div class="val">${r.cortes}</div><div class="det">${r.cortes_plano ? r.cortes_plano + " de plano" : "&nbsp;"}</div></div>
+      <div class="kpi"><div class="rot">Você faturou</div><div class="val">${brl(r.faturado)}</div></div>
+      <div class="kpi destaque"><div class="rot">Sua comissão</div><div class="val pos">${brl(r.comissao)}</div></div>
+    </div>`;
+  $("#hoje-lista").innerHTML = `<h2>Seus lançamentos de hoje</h2>${r.lista.length ? r.lista.map(linhaLanc).join("") : '<p class="vazio">Nada lançado hoje ainda.</p>'}
+    <p class="sutil pequeno-txt">Lançou errado? Apague no ✕ e lance de novo. Só dá para apagar o que você lançou hoje.</p>`;
+  ligarApagar($("#hoje-lista"), atualizarHoje);
+}
+
+// ======================= MEUS NÚMEROS (barbeiro) =======================
+const pMeu = { chave: "semana", de: "", ate: "" };
+ABAS.meus = async (el) => {
+  if (!pMeu.de) [pMeu.de, pMeu.ate] = periodo("semana");
+  el.innerHTML = `<div class="pilha"><div class="linha entre"><h2>Meus números</h2>${seletorPeriodo("per-meu", pMeu, ["hoje", "semana", "semana_passada", "mes", "mes_passado"])}</div><div id="meu-corpo"></div></div>`;
+  const desenhar = async () => {
+    const r = await api(`/meu?de=${pMeu.de}&ate=${pMeu.ate}`);
+    $("#meu-corpo").innerHTML = `<div class="pilha"><div class="kpis">
+        <div class="kpi"><div class="rot">Cortes</div><div class="val">${r.cortes}</div><div class="det">${r.cortes_plano} de plano</div></div>
+        <div class="kpi"><div class="rot">Faturou</div><div class="val">${brl(r.faturado)}</div></div>
+        <div class="kpi"><div class="rot">Comissão</div><div class="val">${brl(r.comissao)}</div></div>
+        <div class="kpi destaque"><div class="rot">A receber</div><div class="val">${brl(r.saldo)}</div><div class="det">já recebeu ${brl(r.pago)}</div></div>
+      </div><section class="cartao">${r.lista.map(linhaLanc).join("") || '<p class="vazio">Nada nesse período.</p>'}</section></div>`;
+    ligarApagar($("#meu-corpo"), desenhar);
+  };
+  ligarPeriodo("per-meu", pMeu, desenhar);
+  await desenhar();
+};
+
 function ligarApagar(el, depois) {
   $$("[data-apagar]", el).forEach((b) => (b.onclick = async () => {
     if (!confirmar("Apagar este lançamento?")) return;
@@ -459,8 +520,8 @@ function editarCliente(c, depois) {
   abrirDialogo(c ? "Editar cliente" : "Novo cliente", [
     { nome: "nome", rotulo: "Nome", valor: c?.nome, obrigatorio: true },
     { nome: "telefone", rotulo: "Telefone / WhatsApp", tipo: "tel", valor: c?.telefone },
-    { nome: "email", rotulo: "E-mail", tipo: "email", valor: c?.email },
-    { nome: "observacoes", rotulo: "Observações", tipo: "textarea", valor: c?.observacoes },
+    ...(papel === "dono" ? [{ nome: "email", rotulo: "E-mail", tipo: "email", valor: c?.email },
+    { nome: "observacoes", rotulo: "Observações", tipo: "textarea", valor: c?.observacoes }] : []),
   ], async (d) => {
     const r = c ? await api("/clientes/" + c.id, { method: "PUT", body: d }) : await post("/clientes", d);
     await recarregarBase();
@@ -605,7 +666,7 @@ ABAS.cadastros = async (el) => {
   await recarregarBase();
   el.innerHTML = `<div class="pilha">
     <section class="cartao"><div class="linha entre"><h2>Barbeiros</h2><button class="btn primario pequeno" id="nv-colab">+ Novo</button></div><div class="tabela-wrap"><table><tbody>
-      ${base.colaboradores.map((c) => `<tr><td>${esc(c.nome)} ${c.ativo ? "" : '<span class="etiqueta">inativo</span>'}<div class="sutil pequeno-txt">${esc(c.telefone || "")}</div></td><td class="dir">comissão padrão ${c.pct_comissao}%</td><td class="dir"><button class="btn fantasma pequeno" data-colab="${c.id}">Editar</button></td></tr>`).join("")}
+      ${base.colaboradores.map((c) => `<tr><td>${esc(c.nome)} ${c.ativo ? "" : '<span class="etiqueta">inativo</span>'} ${c.tem_pin && c.ativo ? '<span class="etiqueta ok">usa o app</span>' : ""}<div class="sutil pequeno-txt">${esc(c.telefone || "")}</div></td><td class="dir">comissão padrão ${c.pct_comissao}%</td><td class="dir"><button class="btn fantasma pequeno" data-colab="${c.id}">Editar</button></td></tr>`).join("")}
     </tbody></table></div><p class="sutil pequeno-txt">A comissão de cada corte segue o percentual do serviço. O percentual padrão do barbeiro só é usado quando o valor é digitado sem escolher um serviço.</p></section>
     <section class="cartao"><div class="linha entre"><h2>Serviços e preços</h2><button class="btn primario pequeno" id="nv-serv">+ Novo</button></div><div class="tabela-wrap"><table><thead><tr><th>Serviço</th><th class="dir">Preço</th><th class="dir">Comissão</th><th></th></tr></thead><tbody>
       ${base.servicos.map((s) => `<tr><td>${esc(s.nome)} ${s.ativo ? "" : '<span class="etiqueta">inativo</span>'}</td><td class="dir num">${brl(s.preco)}</td><td class="dir">${s.pct_comissao}%</td><td class="dir"><button class="btn fantasma pequeno" data-serv="${s.id}">Editar</button></td></tr>`).join("")}
@@ -630,7 +691,9 @@ ABAS.cadastros = async (el) => {
     { nome: "email", rotulo: "E-mail", tipo: "email", valor: c?.email },
     { nome: "pct_comissao", rotulo: "Comissão padrão (%)", tipo: "number", valor: c?.pct_comissao ?? 50 },
     { nome: "ativo", rotulo: "Ativo (aparece no caixa)", tipo: "checkbox", valor: c ? c.ativo : 1 },
-  ], salvar("colaboradores", c), c ? apagarBtn("Apagar barbeiro") : ""); if (c) ligarApagarCad("colaboradores", c); };
+    { nome: "pin", rotulo: c?.tem_pin ? "Novo PIN (vazio = manter o atual)" : "PIN de acesso ao app (4 a 6 números)", tipo: "pin" },
+    ...(c?.tem_pin ? [{ nome: "remover_pin", rotulo: "Tirar o acesso dele ao app", tipo: "checkbox", valor: 0 }] : []),
+  ], salvar("colaboradores", c), `<p class="sutil pequeno-txt">Com um PIN, o barbeiro entra no app pelo celular. Ele só lança os próprios cortes e vê os próprios números. Ele não vê o caixa geral, os colegas, as contas nem o lucro.</p>${c ? apagarBtn("Apagar barbeiro") : ""}`); if (c) ligarApagarCad("colaboradores", c); };
   const edServ = (s) => { abrirDialogo(s ? "Editar serviço" : "Novo serviço", [
     { nome: "nome", rotulo: "Nome", valor: s?.nome, obrigatorio: true },
     { nome: "preco", rotulo: "Preço", tipo: "number", valor: s?.preco },
