@@ -11,6 +11,7 @@ AQUI = pathlib.Path(__file__).parent
 
 # (arquivo, duração de uma volta completa em segundos)
 PLAYLIST = [
+    ("experiencia.html", 11.5),    # Vídeo real da barbearia + textos de experiência
     ("depilacao-cera.html", 42),   # Cera no nariz e ouvido (pelos no nariz e no ouvido)
     ("tabela-precos.html", 46),    # Tabela de preços com a novidade
 ]
