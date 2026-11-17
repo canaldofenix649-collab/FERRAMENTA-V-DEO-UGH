@@ -164,16 +164,13 @@ body.idle { cursor: none; }
   SERVICOS.forEach((s, k) => {
     const bg = k % 2 ? 'white' : 'red';
     const anim = k % 2 ? 'fromright' : 'fromleft';
-    BEATS.push({ t: 3300, bg, fx: 'shake-late', html:
-      `<div class="svc"><div><div class="num ${anim}">${String(k + 1).padStart(2, '0')} / ${String(SERVICOS.length).padStart(2, '0')}</div><div class="big ${anim}" style="font-size:${s.nome.length > 11 ? 170 : 210}px">${s.nome}</div><p class="desc ${anim} d2">${s.desc}</p></div>
+    BEATS.push({ t: 2600, bg, fx: 'shake-late', html:
+      `<div class="svc"><div><div class="big ${anim}" style="font-size:${s.nome.length > 11 ? 170 : 210}px">${s.nome}</div></div>
        <div class="chip stamp">${price(s.preco, 300)}</div></div>` });
   });
-  BEATS.push({ t: 1000, bg: 'white', fx: 'flash', html: `<div class="big slam" style="font-size:340px">Atenção!</div>` });
   BEATS.push({ t: 1800, bg: 'red', fx: 'shake', html: `<div class="badge blink" style="font-size:200px;padding:30px 80px 14px">Novidade</div>` });
-  BEATS.push({ t: 1800, bg: 'ink', html: `<div class="kicker fromleft">Agora na Negueba Show</div><div class="big punch d1" style="font-size:300px">Cera no</div>` });
-  BEATS.push({ t: 1700, bg: 'white', fx: 'shake', html: `<div class="big slam" style="font-size:280px">Nariz + ouvido</div>` });
   BEATS.push({ t: 6000, bg: 'red', fx: 'flash', html:
-    `<div class="nov-side"><div class="txt"><div class="badge fromleft">Novidade</div><div class="big fromleft d1" style="margin-top:34px">Cera no<br>nariz e<br>ouvido</div><div class="kicker fromleft d2" style="margin-top:18px">${NOVIDADE.detalhe}</div></div>
+    `<div class="nov-side"><div class="txt"><div class="badge fromleft">Novidade</div><div class="big fromleft d1" style="margin-top:34px">Cera no<br>nariz e<br>ouvido</div></div>
      <div class="burst slam d1"><div style="position:absolute;inset:0">${burst}</div><div class="inner pulse">${price(NOVIDADE.preco, 320)}<span class="lbl">os dois</span></div></div></div>` });
   BEATS.push({ t: 9000, bg: 'white', nocorner: true, html:
     `<div class="table"><div class="logo-box"><img class="slam" alt="Barbearia Negueba Show" src="${LOGO_COR}"><div class="kicker">Tabela de serviços</div></div>

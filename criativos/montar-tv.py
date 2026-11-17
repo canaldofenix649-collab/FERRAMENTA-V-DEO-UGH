@@ -11,9 +11,10 @@ AQUI = pathlib.Path(__file__).parent
 
 # (arquivo, duração de uma volta completa em segundos)
 PLAYLIST = [
-    ("experiencia.html", 11.5),    # Vídeo real da barbearia + textos de experiência
-    ("depilacao-cera.html", 42),   # Cera no nariz e ouvido (pelos no nariz e no ouvido)
-    ("tabela-precos.html", 46),    # Tabela de preços com a novidade
+    ("experiencia.html", 11.5),    # Vídeo real da barbearia + "Mais que um corte. Uma experiência."
+    ("depilacao-cera.html", 28),   # Cera no nariz e ouvido
+    ("tabela-precos.html", 37.3),  # Tabela de preços com a novidade
+    ("produtos.html", 23.6),       # Pomadas R$25 e pós-barba R$20
 ]
 
 ESCONDE_BOTAO = "<style>#fs{display:none!important}body{cursor:none}</style>"
