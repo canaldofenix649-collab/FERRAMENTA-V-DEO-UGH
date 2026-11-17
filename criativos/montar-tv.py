@@ -14,7 +14,7 @@ PLAYLIST = [
     ("experiencia.html", 11.5),    # Vídeo real da barbearia + "Mais que um corte. Uma experiência."
     ("depilacao-cera.html", 28),   # Cera no nariz e ouvido
     ("tabela-precos.html", 37.3),  # Tabela de preços com a novidade
-    ("produtos.html", 23.6),       # Pomadas R$25 e pós-barba R$20
+    ("produtos.html", 31.4),       # Pomadas (a partir de R$25) e pós-barba R$20
 ]
 
 ESCONDE_BOTAO = "<style>#fs{display:none!important}body{cursor:none}</style>"
@@ -24,7 +24,8 @@ for nome, dur in PLAYLIST:
     html = (AQUI / nome).read_text(encoding="utf-8") + ESCONDE_BOTAO
     itens.append({"b64": base64.b64encode(html.encode("utf-8")).decode(), "dur": dur})
 
-pagina = """<title>TV Negueba Show</title>
+pagina = """<meta charset="utf-8">
+<title>TV Negueba Show</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 :root { --bg: #5e070d; --fg: #ffffff; color-scheme: dark; }
