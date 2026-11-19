@@ -12,12 +12,12 @@ Você só precisa fazer isso uma vez. Não pede cartão de crédito.
 2. No painel, abra **Workers e Pages** (*Workers & Pages*, no menu "Computação") e clique em **Criar** (*Create*).
 3. Escolha **Importar um repositório** (*Import a repository*) e conecte o **GitHub**. Autorize o Cloudflare a ver o repositório `FERRAMENTA-V-DEO-UGH`.
 4. Escolha o repositório. Na tela de configuração:
-   - **Nome do projeto** (*Project name*): `gestao-barbearia`
+   - **Nome do projeto** (*Project name*): `ferramenta-v-deo-ugh` (tem que ser igual ao `name` do `wrangler.jsonc`)
    - **Diretório raiz** (*Root directory*, em "Configurações avançadas"): `barbearia`
    - **Comando de deploy** (*Deploy command*): deixe `npx wrangler deploy`
    - **Branch:** a branch onde está o app (`claude/fervent-hawking-kef530`, ou `main` depois de juntar)
 5. Clique em **Implantar** (*Deploy*) e espere 1 a 2 minutos. O banco de dados é criado sozinho.
-6. Você recebe um endereço parecido com **`https://gestao-barbearia.SEU-NOME.workers.dev`**. É o endereço do app.
+6. Você recebe um endereço parecido com **`https://ferramenta-v-deo-ugh.SEU-NOME.workers.dev`**. É o endereço do app.
 7. Abra o endereço, crie a **senha do dono** (pelo menos 6 caracteres) e vá em **Dados e ajustes → Trazer dados do app antigo**. Envie o `.zip` do app antigo. A importação leva poucos segundos.
 
 Depois disso, toda alteração enviada ao GitHub nessa branch atualiza o app sozinha. Os dados não são apagados.

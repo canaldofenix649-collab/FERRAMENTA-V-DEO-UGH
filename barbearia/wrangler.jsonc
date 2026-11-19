@@ -1,7 +1,7 @@
 {
   // Configuração do Cloudflare. O banco de dados (D1) é criado sozinho na primeira publicação.
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gestao-barbearia",
+  "name": "ferramenta-v-deo-ugh",
   "main": "src/worker.js",
   "compatibility_date": "2026-11-01",
   "assets": {
