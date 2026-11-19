@@ -12,6 +12,7 @@ AQUI = pathlib.Path(__file__).parent
 # (arquivo, duração de uma volta completa em segundos)
 PLAYLIST = [
     ("experiencia.html", 11.5),    # Vídeo real da barbearia + "Mais que um corte. Uma experiência."
+    ("cortes.html", 19),          # Cortes: degradê, risco, freestyle, cacheado
     ("depilacao-cera.html", 28),   # Cera no nariz e ouvido
     ("tabela-precos.html", 37.3),  # Tabela de preços com a novidade
     ("produtos.html", 31.4),       # Pomadas (a partir de R$25) e pós-barba R$20
