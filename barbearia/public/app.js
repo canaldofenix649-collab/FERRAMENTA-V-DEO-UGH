@@ -347,7 +347,8 @@ function linhaLanc(t) {
   const valor = t.tipo === "commission" ? `+${brl(t.comissao)} com.` : (t.tipo === "expense" ? "−" : "") + brl(t.valor);
   const desc = t.descricao || (t.tipo === "service" ? "Serviço" : TIPOS[t.tipo]);
   const det = [papel === "dono" && t.colaborador && primeiroNome(t.colaborador), t.cliente, FORMAS[t.forma_pagamento], t.comissao && t.tipo !== "commission" ? "comissão " + brl(t.comissao) : ""].filter(Boolean).join(" · ");
-  return `<div class="lanc"><span class="hora">${t.data_hora.slice(11)}</span><div class="info"><div>${esc(desc)}</div><div class="sutil pequeno-txt">${esc(det)}</div></div>
+  const quando = t.data_hora.slice(0, 10) === hoje ? t.data_hora.slice(11) : `${diaMes(t.data_hora)}<br>${t.data_hora.slice(11)}`;
+  return `<div class="lanc"><span class="hora">${quando}</span><div class="info"><div>${esc(desc)}</div><div class="sutil pequeno-txt">${esc(det)}</div></div>
     <span class="num ${sinal}">${valor}</span>${podeApagar(t) ? `<button class="btn fantasma pequeno perigo" data-apagar="${t.id}" title="Apagar">✕</button>` : ""}</div>`;
 }
 function podeApagar(t) {
@@ -368,18 +369,32 @@ async function atualizarHojeBarbeiro() {
 }
 
 // ======================= MEUS NÚMEROS (barbeiro) =======================
-const pMeu = { chave: "semana", de: "", ate: "" };
+const pMeu = { chave: "mes", de: "", ate: "" };
 ABAS.meus = async (el) => {
-  if (!pMeu.de) [pMeu.de, pMeu.ate] = periodo("semana");
-  el.innerHTML = `<div class="pilha"><div class="linha entre"><h2>Meus números</h2>${seletorPeriodo("per-meu", pMeu, ["hoje", "semana", "semana_passada", "mes", "mes_passado"])}</div><div id="meu-corpo"></div></div>`;
+  if (!pMeu.de) [pMeu.de, pMeu.ate] = periodo("mes");
+  el.innerHTML = `<div class="pilha"><div class="linha entre"><h2>Meus números</h2>${seletorPeriodo("per-meu", pMeu, ["hoje", "semana", "semana_passada", "mes", "mes_passado", "ano", "tudo"])}</div><div id="meu-corpo"></div></div>`;
   const desenhar = async () => {
     const r = await api(`/meu?de=${pMeu.de}&ate=${pMeu.ate}`);
+    const curto = (new Date(pMeu.ate) - new Date(pMeu.de)) / 864e5 <= 7; // acerto de comissão é semanal
+    const meses = r.meses.length > 1 ? `<section class="cartao"><h3>Mês a mês</h3><div class="tabela-wrap"><table>
+        <thead><tr><th>Mês</th><th class="dir">Cortes</th><th class="dir esconde-cel">Faturou</th><th class="dir">Comissão</th><th class="dir">Recebeu</th></tr></thead><tbody>
+        ${r.meses.map((m) => `<tr><td>${mesNome(m.mes)}</td><td class="dir num">${m.cortes}</td><td class="dir num esconde-cel">${brl(m.faturado)}</td><td class="dir num">${brl(m.comissao)}</td><td class="dir num">${brl(m.pago)}</td></tr>`).join("")}
+        </tbody></table></div></section>` : "";
+    const pagamentos = `<section class="cartao"><h3>Pagamentos e vales que você recebeu</h3>
+        ${r.pagamentos.map((x) => `<div class="lanc"><span class="hora">${diaMes(x.data_hora)}</span><div class="info"><div>${esc(x.descricao || "Pagamento")}</div><div class="sutil pequeno-txt">${esc(FORMAS[x.forma_pagamento] || "")}</div></div><span class="num pos">${brl(x.valor)}</span></div>`).join("") || '<p class="vazio">Nenhum pagamento lançado nesse período.</p>'}</section>`;
     $("#meu-corpo").innerHTML = `<div class="pilha"><div class="kpis">
         <div class="kpi"><div class="rot">Cortes</div><div class="val">${r.cortes}</div><div class="det">${r.cortes_plano} de plano</div></div>
         <div class="kpi"><div class="rot">Faturou</div><div class="val">${brl(r.faturado)}</div></div>
         <div class="kpi"><div class="rot">Comissão</div><div class="val">${brl(r.comissao)}</div></div>
-        <div class="kpi destaque"><div class="rot">A receber</div><div class="val">${brl(r.saldo)}</div><div class="det">já recebeu ${brl(r.pago)}</div></div>
-      </div><section class="cartao">${r.lista.map(linhaLanc).join("") || '<p class="vazio">Nada nesse período.</p>'}</section></div>`;
+        ${curto
+          ? `<div class="kpi destaque"><div class="rot">Falta receber</div><div class="val">${brl(r.saldo)}</div><div class="det">já recebeu ${brl(r.pago)}</div></div>`
+          : `<div class="kpi destaque"><div class="rot">Recebeu</div><div class="val">${brl(r.pago)}</div><div class="det">pagamentos e vales lançados</div></div>`}
+      </div>
+      <p class="sutil pequeno-txt" style="margin:0">${curto
+        ? '"Falta receber" = comissão do período menos o que você recebeu nele.'
+        : 'Para ver quanto falta receber, escolha "Esta semana" ou "Semana passada". No histórico antigo, nem todo pagamento foi lançado no app.'}</p>
+      ${meses}${pagamentos}
+      <section class="cartao"><h3>Seus cortes${r.lista_total > r.lista.length ? ` (os ${r.lista.length} mais recentes de ${r.lista_total})` : ""}</h3>${r.lista.map(linhaLanc).join("") || '<p class="vazio">Nada nesse período.</p>'}</section></div>`;
     ligarApagar($("#meu-corpo"), desenhar);
   };
   ligarPeriodo("per-meu", pMeu, desenhar);

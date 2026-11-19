@@ -458,19 +458,31 @@ export async function importarLote(db, arquivo, linhas) {
 // Só lança os próprios serviços, vê os próprios números e apaga o que ele mesmo lançou no dia.
 async function resumoBarbeiro(db, colabId, de, ate) {
   const p = [de + " 00:00", ate + " 23:59", colabId];
-  const [g, lista] = await Promise.all([
-    db.get(`SELECT
-      COUNT(CASE WHEN tipo='service' THEN 1 END) cortes,
+  const LIMITE_LISTA = 300;
+  const somas = `COUNT(CASE WHEN tipo='service' THEN 1 END) cortes,
       COUNT(CASE WHEN tipo='service' AND forma_pagamento='plan' THEN 1 END) cortes_plano,
       COALESCE(SUM(CASE WHEN tipo='service' THEN valor END),0) faturado,
       COALESCE(SUM(CASE WHEN tipo IN ('service','commission','income') THEN comissao END),0) comissao,
-      COALESCE(SUM(CASE WHEN tipo='expense' AND categoria='comissao_paga' THEN valor END),0) pago
+      COALESCE(SUM(CASE WHEN tipo='expense' AND categoria='comissao_paga' THEN valor END),0) pago`;
+  const [g, meses, pagamentos, lista] = await Promise.all([
+    db.get(`SELECT ${somas}, COUNT(CASE WHEN NOT (tipo='expense' AND categoria='comissao_paga') THEN 1 END) n_lanc
       FROM transacoes WHERE data_hora BETWEEN ? AND ? AND colaborador_id = ?`, p),
+    db.all(`SELECT substr(data_hora,1,7) mes, ${somas}
+      FROM transacoes WHERE data_hora BETWEEN ? AND ? AND colaborador_id = ? GROUP BY 1 ORDER BY 1 DESC`, p),
+    db.all(`SELECT id, data_hora, descricao, valor, forma_pagamento FROM transacoes
+      WHERE data_hora BETWEEN ? AND ? AND colaborador_id = ? AND tipo='expense' AND categoria='comissao_paga' ORDER BY data_hora DESC LIMIT 200`, p),
     db.all(`SELECT t.id, t.data_hora, t.tipo, t.categoria, t.descricao, t.valor, t.comissao, t.forma_pagamento, t.lancado_por, c.nome cliente
       FROM transacoes t LEFT JOIN clientes c ON c.id = t.cliente_id
-      WHERE t.data_hora BETWEEN ? AND ? AND t.colaborador_id = ? ORDER BY t.data_hora DESC, t.rowid DESC LIMIT 2000`, p),
+      WHERE t.data_hora BETWEEN ? AND ? AND t.colaborador_id = ? AND NOT (t.tipo='expense' AND t.categoria='comissao_paga')
+      ORDER BY t.data_hora DESC, t.rowid DESC LIMIT ${LIMITE_LISTA}`, p),
   ]);
-  return { de, ate, cortes: g.cortes, cortes_plano: g.cortes_plano, faturado: r2(g.faturado), comissao: r2(g.comissao), pago: r2(g.pago), saldo: r2(g.comissao - g.pago), lista };
+  const fmt = (x) => ({ cortes: x.cortes, cortes_plano: x.cortes_plano, faturado: r2(x.faturado), comissao: r2(x.comissao), pago: r2(x.pago), saldo: r2(x.comissao - x.pago) });
+  return {
+    de, ate, ...fmt(g),
+    meses: meses.map((m) => ({ mes: m.mes, ...fmt(m) })),
+    pagamentos: pagamentos.map((x) => ({ ...x, valor: r2(x.valor) })),
+    lista, lista_total: g.n_lanc,
+  };
 }
 
 async function apiBarbeiro(req, db, rota, m, q, colab) {
