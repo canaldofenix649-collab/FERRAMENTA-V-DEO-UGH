@@ -6,6 +6,7 @@
 //  - até 100 valores (?) por consulta      -> importação usa SQL com valores escritos (escapados)
 //  - pouco tempo de CPU por acesso         -> o .zip é lido no navegador e chega aqui em partes
 import { garantirSchema, COLUNAS, ORDEM_TABELAS } from "./schema.js";
+import { chavesVapid, enviarPush, endpointValido } from "./push.js";
 
 const SESSAO_DIAS = 60;
 const PBKDF2_ITER = 20000;
@@ -181,7 +182,7 @@ async function novoLancamento(db, d) {
   const gravar = async (t, extras = []) => {
     const { id, cmds } = lancamentoSql(t, tx);
     await db.batch([...cmds, ...extras]);
-    return { id };
+    return { id, lancado: { ...t, colaborador_nome: colab?.nome ?? null } };
   };
   if (tipo === "service") {
     if (!colab) throw new Erro(400, "Escolha quem fez o serviço.");
@@ -471,8 +472,8 @@ async function resumoBarbeiro(db, colabId, de, ate) {
       FROM transacoes WHERE data_hora BETWEEN ? AND ? AND colaborador_id = ? GROUP BY 1 ORDER BY 1 DESC`, p),
     db.all(`SELECT id, data_hora, descricao, valor, forma_pagamento FROM transacoes
       WHERE data_hora BETWEEN ? AND ? AND colaborador_id = ? AND tipo='expense' AND categoria='comissao_paga' ORDER BY data_hora DESC LIMIT 200`, p),
-    db.all(`SELECT t.id, t.data_hora, t.tipo, t.categoria, t.descricao, t.valor, t.comissao, t.forma_pagamento, t.lancado_por, c.nome cliente
-      FROM transacoes t LEFT JOIN clientes c ON c.id = t.cliente_id
+    db.all(`SELECT t.id, t.data_hora, t.tipo, t.descricao, t.valor, t.comissao, t.forma_pagamento
+      FROM transacoes t
       WHERE t.data_hora BETWEEN ? AND ? AND t.colaborador_id = ? AND NOT (t.tipo='expense' AND t.categoria='comissao_paga')
       ORDER BY t.data_hora DESC, t.rowid DESC LIMIT ${LIMITE_LISTA}`, p),
   ]);
@@ -485,36 +486,45 @@ async function resumoBarbeiro(db, colabId, de, ate) {
   };
 }
 
+// O barbeiro só CONSULTA os próprios números. Quem lança, apaga e cadastra é só o dono.
 async function apiBarbeiro(req, db, rota, m, q, colab) {
   const hoje = hojeBrasilia();
   if (rota === "/base" && m === "GET") {
-    const [servicos, clientes, planos, nome] = await Promise.all([
-      db.all("SELECT id, nome, preco, pct_comissao, ativo FROM servicos WHERE ativo = 1 ORDER BY nome COLLATE NOCASE"),
-      db.all("SELECT id, nome FROM clientes ORDER BY nome COLLATE NOCASE"),
-      db.all("SELECT id, cliente_id, plano, servicos_inclusos, cortes_maximos FROM planos WHERE status='active'"),
-      getConfig(db, "nome_barbearia", "Minha Barbearia"),
-    ]);
-    return json({ colaboradores: [{ id: colab.id, nome: colab.nome, pct_comissao: colab.pct_comissao, ativo: 1 }], servicos, produtos: [], clientes, planos, nome });
+    return json({ colaboradores: [{ id: colab.id, nome: colab.nome, ativo: 1 }], servicos: [], produtos: [], clientes: [], planos: [], nome: await getConfig(db, "nome_barbearia", "Minha Barbearia") });
   }
   if (rota === "/meu" && m === "GET") return json(await resumoBarbeiro(db, colab.id, q.de || hoje, q.ate || q.de || hoje));
-  if (rota === "/transacoes" && m === "POST") {
-    const d = await corpoJson(req);
-    if (d.tipo !== "service") throw new Erro(403, "Só o dono lança entradas e saídas.");
-    // vale sempre quem está logado e a tabela de preços, não o que vier do celular
-    return json(await novoLancamento(db, { tipo: "service", servicos: d.servicos, forma_pagamento: d.forma_pagamento, cliente_id: d.cliente_id, valor: d.valor, colaborador_id: colab.id, lancado_por: colab.id }));
-  }
-  const mt = /^\/transacoes\/([\w-]+)$/.exec(rota);
-  if (mt && m === "DELETE") {
-    const t = await db.get("SELECT id, lancado_por, data_hora FROM transacoes WHERE id = ?", [mt[1]]);
-    if (!t || t.lancado_por !== colab.id || t.data_hora.slice(0, 10) !== hoje) throw new Erro(403, "Você só pode apagar o que você mesmo lançou hoje. Para outros casos, fale com o dono.");
-    await apagarLancamento(db, t.id);
-    return json({ ok: true });
-  }
-  if (rota === "/clientes" && m === "POST") {
-    const d = await corpoJson(req);
-    return json({ id: await salvarCadastro(db, "clientes", { nome: d.nome, telefone: d.telefone }) });
-  }
   throw new Erro(403, "Essa área é só do dono.");
+}
+
+// ---------- notificações dos lançamentos ----------
+const reais = (v) => "R$ " + (Math.round((Number(v) || 0) * 100) / 100).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const FORMAS_TXT = { cash: "dinheiro", pix: "PIX", debit_card: "débito", credit_card: "crédito", plan: "plano", other: "outro" };
+
+/** O barbeiro recebe aviso quando o dono lança no nome dele:
+ *  corte, pagamento de comissão, vale ou comissão extra. */
+async function notificarLancamento(db, t, origem) {
+  if (!t?.colaborador_id) return;
+  const desc = t.descricao || "Serviço";
+  let paraBarbeiro = null;
+  if (t.tipo === "service") {
+    const valor = t.forma_pagamento === "plan" ? "plano" : `${reais(t.valor)} no ${FORMAS_TXT[t.forma_pagamento] || "caixa"}`;
+    paraBarbeiro = { titulo: "Corte lançado pra você ✂️", corpo: `${desc} · ${valor} · sua comissão ${reais(t.comissao)}`, url: "/#meus" };
+  } else if (t.tipo === "expense" && t.categoria === "comissao_paga") {
+    paraBarbeiro = { titulo: `Você recebeu ${reais(t.valor)} 💰`, corpo: desc, url: "/#meus" };
+  } else if (t.tipo === "commission") {
+    paraBarbeiro = { titulo: `Comissão extra: ${reais(t.comissao)}`, corpo: desc, url: "/#meus" };
+  }
+  if (!paraBarbeiro) return;
+  await enviarPush(db, await db.all("SELECT * FROM push_inscricoes WHERE colaborador_id = ?", [t.colaborador_id]), paraBarbeiro, origem);
+}
+/** Responde na hora e envia a notificação em segundo plano. */
+function responderLancamento(ctx, r) {
+  if (r?.lancado) {
+    const envio = notificarLancamento(ctx.db, r.lancado, ctx.origem).catch((e) => console.error("notificação", e));
+    ctx.esperar ? ctx.esperar(envio) : envio;
+  }
+  const { lancado, ...resto } = r;
+  return json(resto);
 }
 
 // ---------- proteção contra chute de senha/PIN (guardada no banco) ----------
@@ -546,6 +556,7 @@ async function rotear(req, ctx) {
   const { db } = ctx;
   await garantirSchema(db);
   const url = new URL(req.url);
+  ctx.origem = url.origin;
   const m = req.method;
   const rota = url.pathname.replace(/^\/api/, "");
   const q = Object.fromEntries(url.searchParams);
@@ -619,6 +630,29 @@ async function rotear(req, ctx) {
 
   const u = await quem();
   if (!u) throw new Erro(401, "Entre de novo.");
+  // notificações: valem para dono e barbeiro
+  if (rota === "/push/chave" && m === "GET") return json({ chave: (await chavesVapid(db)).pub });
+  if (rota === "/push/inscrever" && m === "POST") {
+    const d = await corpoJson(req);
+    if (!endpointValido(d.endpoint) || !d.keys?.p256dh || !d.keys?.auth) throw new Erro(400, "Este celular não aceitou as notificações.");
+    await db.run(`INSERT INTO push_inscricoes (endpoint, p256dh, auth, colaborador_id, criado_em) VALUES (?,?,?,?,?)
+      ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth, colaborador_id=excluded.colaborador_id`,
+      [d.endpoint, d.keys.p256dh, d.keys.auth, u.dono ? null : u.colab.id, agoraBrasilia()]);
+    return json({ ok: true });
+  }
+  if (rota === "/push/cancelar" && m === "POST") {
+    const d = await corpoJson(req);
+    await db.run("DELETE FROM push_inscricoes WHERE endpoint = ?", [String(d.endpoint || "")]);
+    return json({ ok: true });
+  }
+  if (rota === "/push/teste" && m === "POST") {
+    const d = await corpoJson(req);
+    const s = await db.all("SELECT * FROM push_inscricoes WHERE endpoint = ?", [String(d.endpoint || "")]);
+    if (!s.length) throw new Erro(400, "Este celular não está com as notificações ativadas.");
+    await enviarPush(db, s, { titulo: "Notificações ativadas ✅", corpo: "Você vai receber os avisos da barbearia neste celular.", url: "/" }, url.origin);
+    return json({ ok: true });
+  }
+
   if (!u.dono) return apiBarbeiro(req, db, rota, m, q, u.colab);
 
   // ================= daqui para baixo: só o dono =================
@@ -637,7 +671,7 @@ async function rotear(req, ctx) {
   if (rota === "/resumo" && m === "GET") return json(await resumo(db, q.de || hoje.slice(0, 8) + "01", q.ate || hoje));
   if (rota === "/meses" && m === "GET") return json(await mesAMes(db));
   if (rota === "/transacoes" && m === "GET") return json(await listaTransacoes(db, q));
-  if (rota === "/transacoes" && m === "POST") return json(await novoLancamento(db, await corpoJson(req)));
+  if (rota === "/transacoes" && m === "POST") return responderLancamento(ctx, await novoLancamento(db, { ...(await corpoJson(req)), lancado_por: null }));
   let mt = /^\/transacoes\/([\w-]+)$/.exec(rota);
   if (mt && m === "DELETE") { await apagarLancamento(db, mt[1]); return json({ ok: true }); }
 
@@ -676,10 +710,11 @@ async function rotear(req, ctx) {
     if (!f) throw new Erro(404, "Fiado não encontrado.");
     if (f.status === "paid") throw new Erro(400, "Esse fiado já foi pago.");
     const forma = forma_pagamento || "cash";
-    const { cmds } = lancamentoSql({ tipo: "service", descricao: `Pagamento de fiado - ${f.descricao || "Serviço"}`, valor: f.valor, comissao: f.pct_comissao != null ? (f.valor * f.pct_comissao) / 100 : 0,
-      forma_pagamento: forma, cliente_id: f.cliente_id, colaborador_id: f.colaborador_id }, await taxas(db));
+    const lancado = { tipo: "service", descricao: `Pagamento de fiado - ${f.descricao || "Serviço"}`, valor: f.valor, comissao: f.pct_comissao != null ? (f.valor * f.pct_comissao) / 100 : 0,
+      forma_pagamento: forma, cliente_id: f.cliente_id, colaborador_id: f.colaborador_id };
+    const { cmds } = lancamentoSql(lancado, await taxas(db));
     await db.batch([...cmds, ["UPDATE fiados SET status='paid', pago_em=?, forma_pagamento=? WHERE id=? AND status <> 'paid'", [hoje, forma, f.id]]]);
-    return json({ ok: true });
+    return responderLancamento(ctx, { ok: true, lancado });
   }
   // Conta: pagar (se for mensal, já cria a do mês seguinte) / desfazer
   mt = /^\/contas\/([\w-]+)\/pagar$/.exec(rota);

@@ -1,6 +1,6 @@
 // Service worker: permite instalar como aplicativo e abre a tela mesmo com internet ruim.
 // Os dados (/api) sempre vêm do servidor, nunca do cache.
-const CACHE = "barbearia-v4";
+const CACHE = "barbearia-v5";
 const ARQUIVOS = ["/", "/index.html", "/app.js", "/style.css", "/icone.svg", "/manifest.webmanifest", "/zipcsv.js"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
@@ -20,4 +20,27 @@ self.addEventListener("fetch", (e) => {
       })
       .catch(() => caches.match(e.request).then((r) => r || caches.match("/index.html"))),
   );
+});
+
+// Notificação chegando (ex.: "Corte lançado pra você").
+self.addEventListener("push", (e) => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch { m = { corpo: e.data?.text() }; }
+  e.waitUntil(self.registration.showNotification(m.titulo || "Barbearia", {
+    body: m.corpo || "",
+    icon: "/icone-192.png",
+    badge: "/icone-192.png",
+    data: { url: m.url || "/" },
+    tag: m.tag,
+  }));
+});
+// Tocar na notificação abre o app.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const alvo = new URL(e.notification.data?.url || "/", self.location.origin).href;
+  e.waitUntil((async () => {
+    const abertas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of abertas) if ("focus" in c) { await c.navigate(alvo).catch(() => {}); return c.focus(); }
+    return self.clients.openWindow(alvo);
+  })());
 });

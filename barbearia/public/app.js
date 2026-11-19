@@ -17,7 +17,7 @@ let abaAtual = "caixa";
 let papel = null; // "dono" ou "barbeiro"
 let eu = null;    // { id, nome } quando é barbeiro
 let ambiente = "local"; // "cloudflare" ou "local"
-const ABAS_BARBEIRO = ["caixa", "meus"];
+const ABAS_BARBEIRO = ["meus"];
 
 // ---------- API ----------
 async function api(caminho, opcoes = {}) {
@@ -158,8 +158,9 @@ async function iniciar() {
   $("#tela-entrada").hidden = true;
   $("#app").hidden = false;
   $$("#abas button").forEach((b) => (b.hidden = papel === "barbeiro" ? !ABAS_BARBEIRO.includes(b.dataset.aba) : b.dataset.aba === "meus"));
+  $("#abas").hidden = papel === "barbeiro"; // barbeiro tem uma tela só
   $("#quem-sou").textContent = eu ? primeiroNome(eu.nome) : "";
-  abrirAba(location.hash.slice(1) || "caixa");
+  abrirAba(location.hash.slice(1) || (papel === "barbeiro" ? "meus" : "caixa"));
 }
 let estadoEntrada = null, entradaComo = null; // null = dono; id = barbeiro
 try { entradaComo = localStorage.getItem("entrada_como") || null; } catch {}
@@ -202,7 +203,8 @@ $("#btn-sair").onclick = async () => { await post("/logout"); history.replaceSta
 const ABAS = {};
 $("#abas").onclick = (e) => { const b = e.target.closest("button[data-aba]"); if (b) abrirAba(b.dataset.aba); };
 function abrirAba(nome) {
-  if (!ABAS[nome] || (papel === "barbeiro" && !ABAS_BARBEIRO.includes(nome)) || (papel === "dono" && nome === "meus")) nome = "caixa";
+  if (papel === "barbeiro" && !ABAS_BARBEIRO.includes(nome)) nome = "meus";
+  if (!ABAS[nome] || (papel === "dono" && nome === "meus")) nome = "caixa";
   abaAtual = nome;
   history.replaceState(null, "", "#" + nome);
   $$("#abas button").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === nome));
@@ -316,7 +318,6 @@ async function lancarNovo() {
 }
 
 async function atualizarHoje() {
-  if (papel === "barbeiro") return atualizarHojeBarbeiro();
   const [res, lista, cx] = await Promise.all([api(`/resumo?de=${hoje}&ate=${hoje}`), api(`/transacoes?de=${hoje}&sem_taxas=1`), api("/caixa")]);
   const g = res.geral;
   const caixaTxt = !cx.caixa
@@ -346,60 +347,116 @@ function linhaLanc(t) {
   const sinal = t.tipo === "expense" ? "neg" : t.tipo === "commission" ? "" : "pos";
   const valor = t.tipo === "commission" ? `+${brl(t.comissao)} com.` : (t.tipo === "expense" ? "−" : "") + brl(t.valor);
   const desc = t.descricao || (t.tipo === "service" ? "Serviço" : TIPOS[t.tipo]);
-  const det = [papel === "dono" && t.colaborador && primeiroNome(t.colaborador), t.cliente, FORMAS[t.forma_pagamento], t.comissao && t.tipo !== "commission" ? "comissão " + brl(t.comissao) : ""].filter(Boolean).join(" · ");
+  const det = [papel === "dono" && t.colaborador && primeiroNome(t.colaborador), papel === "dono" && t.cliente, FORMAS[t.forma_pagamento], t.comissao && t.tipo !== "commission" ? "comissão " + brl(t.comissao) : ""].filter(Boolean).join(" · ");
   const quando = t.data_hora.slice(0, 10) === hoje ? t.data_hora.slice(11) : `${diaMes(t.data_hora)}<br>${t.data_hora.slice(11)}`;
   return `<div class="lanc"><span class="hora">${quando}</span><div class="info"><div>${esc(desc)}</div><div class="sutil pequeno-txt">${esc(det)}</div></div>
     <span class="num ${sinal}">${valor}</span>${podeApagar(t) ? `<button class="btn fantasma pequeno perigo" data-apagar="${t.id}" title="Apagar">✕</button>` : ""}</div>`;
 }
-function podeApagar(t) {
-  if (papel === "dono") return true;
-  return !!eu && t.lancado_por === eu.id && t.data_hora.slice(0, 10) === hoje;
-}
-async function atualizarHojeBarbeiro() {
-  const r = await api(`/meu?de=${hoje}`);
-  $("#hoje-resumo").innerHTML = `<h2>Seu dia · ${dataBR(hoje)}</h2>
-    <div class="kpis">
-      <div class="kpi"><div class="rot">Cortes</div><div class="val">${r.cortes}</div><div class="det">${r.cortes_plano ? r.cortes_plano + " de plano" : "&nbsp;"}</div></div>
-      <div class="kpi"><div class="rot">Você faturou</div><div class="val">${brl(r.faturado)}</div></div>
-      <div class="kpi destaque"><div class="rot">Sua comissão</div><div class="val pos">${brl(r.comissao)}</div></div>
-    </div>`;
-  $("#hoje-lista").innerHTML = `<h2>Seus lançamentos de hoje</h2>${r.lista.length ? r.lista.map(linhaLanc).join("") : '<p class="vazio">Nada lançado hoje ainda.</p>'}
-    <p class="sutil pequeno-txt">Lançou errado? Apague no ✕ e lance de novo. Só dá para apagar o que você lançou hoje.</p>`;
-  ligarApagar($("#hoje-lista"), atualizarHoje);
-}
-
+const podeApagar = () => papel === "dono"; // barbeiro só consulta
 // ======================= MEUS NÚMEROS (barbeiro) =======================
-const pMeu = { chave: "mes", de: "", ate: "" };
+const pMeu = { chave: "semana", de: "", ate: "" };
 ABAS.meus = async (el) => {
-  if (!pMeu.de) [pMeu.de, pMeu.ate] = periodo("mes");
-  el.innerHTML = `<div class="pilha"><div class="linha entre"><h2>Meus números</h2>${seletorPeriodo("per-meu", pMeu, ["hoje", "semana", "semana_passada", "mes", "mes_passado", "ano", "tudo"])}</div><div id="meu-corpo"></div></div>`;
+  if (!pMeu.de) [pMeu.de, pMeu.ate] = periodo("semana");
+  el.innerHTML = `<div class="pilha">
+    <section class="cartao" id="meu-hoje"><p class="vazio">Carregando…</p></section>
+    <div id="meu-notif"></div>
+    <div class="linha entre"><h2>Meus números</h2>${seletorPeriodo("per-meu", pMeu, ["semana", "semana_passada", "mes", "mes_passado", "ano", "tudo"])}</div>
+    <div id="meu-corpo"></div></div>`;
+  const desenharHoje = async () => {
+    const r = await api(`/meu?de=${hoje}`);
+    $("#meu-hoje").innerHTML = `<h2>Olá, ${esc(primeiroNome(eu?.nome))}! Hoje · ${dataBR(hoje)}</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="rot">Cortes hoje</div><div class="val">${r.cortes}</div><div class="det">${r.cortes_plano ? r.cortes_plano + " de plano" : "&nbsp;"}</div></div>
+        <div class="kpi"><div class="rot">Você gerou</div><div class="val">${brl(r.faturado)}</div></div>
+        <div class="kpi destaque"><div class="rot">Sua comissão</div><div class="val pos">${brl(r.comissao)}</div></div>
+      </div>`;
+  };
   const desenhar = async () => {
     const r = await api(`/meu?de=${pMeu.de}&ate=${pMeu.ate}`);
     const curto = (new Date(pMeu.ate) - new Date(pMeu.de)) / 864e5 <= 7; // acerto de comissão é semanal
     const meses = r.meses.length > 1 ? `<section class="cartao"><h3>Mês a mês</h3><div class="tabela-wrap"><table>
-        <thead><tr><th>Mês</th><th class="dir">Cortes</th><th class="dir esconde-cel">Faturou</th><th class="dir">Comissão</th><th class="dir">Recebeu</th></tr></thead><tbody>
+        <thead><tr><th>Mês</th><th class="dir">Cortes</th><th class="dir esconde-cel">Gerou</th><th class="dir">Comissão</th><th class="dir">Recebeu</th></tr></thead><tbody>
         ${r.meses.map((m) => `<tr><td>${mesNome(m.mes)}</td><td class="dir num">${m.cortes}</td><td class="dir num esconde-cel">${brl(m.faturado)}</td><td class="dir num">${brl(m.comissao)}</td><td class="dir num">${brl(m.pago)}</td></tr>`).join("")}
         </tbody></table></div></section>` : "";
     const pagamentos = `<section class="cartao"><h3>Pagamentos e vales que você recebeu</h3>
-        ${r.pagamentos.map((x) => `<div class="lanc"><span class="hora">${diaMes(x.data_hora)}</span><div class="info"><div>${esc(x.descricao || "Pagamento")}</div><div class="sutil pequeno-txt">${esc(FORMAS[x.forma_pagamento] || "")}</div></div><span class="num pos">${brl(x.valor)}</span></div>`).join("") || '<p class="vazio">Nenhum pagamento lançado nesse período.</p>'}</section>`;
+        ${r.pagamentos.map((x) => `<div class="lanc"><span class="hora">${diaMes(x.data_hora)}</span><div class="info"><div>${esc(x.descricao || "Pagamento")}</div><div class="sutil pequeno-txt">${esc(FORMAS[x.forma_pagamento] || "")}</div></div><span class="num pos">${brl(x.valor)}</span></div>`).join("") || '<p class="vazio">Nenhum pagamento nesse período.</p>'}</section>`;
     $("#meu-corpo").innerHTML = `<div class="pilha"><div class="kpis">
         <div class="kpi"><div class="rot">Cortes</div><div class="val">${r.cortes}</div><div class="det">${r.cortes_plano} de plano</div></div>
-        <div class="kpi"><div class="rot">Faturou</div><div class="val">${brl(r.faturado)}</div></div>
-        <div class="kpi"><div class="rot">Comissão</div><div class="val">${brl(r.comissao)}</div></div>
+        <div class="kpi"><div class="rot">Você gerou</div><div class="val">${brl(r.faturado)}</div></div>
+        <div class="kpi"><div class="rot">Sua comissão</div><div class="val">${brl(r.comissao)}</div></div>
         ${curto
           ? `<div class="kpi destaque"><div class="rot">Falta receber</div><div class="val">${brl(r.saldo)}</div><div class="det">já recebeu ${brl(r.pago)}</div></div>`
-          : `<div class="kpi destaque"><div class="rot">Recebeu</div><div class="val">${brl(r.pago)}</div><div class="det">pagamentos e vales lançados</div></div>`}
+          : `<div class="kpi destaque"><div class="rot">Recebeu</div><div class="val">${brl(r.pago)}</div><div class="det">pagamentos e vales</div></div>`}
       </div>
       <p class="sutil pequeno-txt" style="margin:0">${curto
-        ? '"Falta receber" = comissão do período menos o que você recebeu nele.'
-        : 'Para ver quanto falta receber, escolha "Esta semana" ou "Semana passada". No histórico antigo, nem todo pagamento foi lançado no app.'}</p>
+        ? '"Falta receber" = sua comissão no período menos o que você já recebeu nele.'
+        : 'Para ver quanto falta receber, escolha "Esta semana" ou "Semana passada".'}</p>
       ${meses}${pagamentos}
       <section class="cartao"><h3>Seus cortes${r.lista_total > r.lista.length ? ` (os ${r.lista.length} mais recentes de ${r.lista_total})` : ""}</h3>${r.lista.map(linhaLanc).join("") || '<p class="vazio">Nada nesse período.</p>'}</section></div>`;
-    ligarApagar($("#meu-corpo"), desenhar);
   };
   ligarPeriodo("per-meu", pMeu, desenhar);
-  await desenhar();
+  await Promise.all([desenharHoje(), desenhar(), desenharNotificacoes($("#meu-notif"))]);
 };
+
+// ======================= NOTIFICAÇÕES =======================
+const ehIphone = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const instalado = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+async function estadoPush() {
+  const suportado = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if (!suportado) return { suportado };
+  const reg = await navigator.serviceWorker.ready;
+  return { suportado, permissao: Notification.permission, inscricao: await reg.pushManager.getSubscription() };
+}
+function chaveParaBytes(b64) {
+  const s = atob(b64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64.length + 3) % 4));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+async function ativarPush() {
+  if ((await Notification.requestPermission()) !== "granted") throw new Error("Você não permitiu as notificações. Dá para liberar nas configurações do celular.");
+  const { chave } = await api("/push/chave");
+  const reg = await navigator.serviceWorker.ready;
+  const insc = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(chave) }));
+  await post("/push/inscrever", insc.toJSON());
+  await post("/push/teste", { endpoint: insc.endpoint });
+}
+async function desativarPush() {
+  const reg = await navigator.serviceWorker.ready;
+  const insc = await reg.pushManager.getSubscription();
+  if (insc) { await post("/push/cancelar", { endpoint: insc.endpoint }); await insc.unsubscribe(); }
+}
+/** Cartão de notificações. Para o barbeiro, some quando já está ativado (fica só um link discreto). */
+async function desenharNotificacoes(el) {
+  if (!el) return;
+  const msg = papel === "dono"
+    ? "Você não recebe avisos dos seus próprios lançamentos. As notificações são para os barbeiros."
+    : "Receba um aviso no celular sempre que um corte for lançado pra você ou quando receber um pagamento.";
+  let e;
+  try { e = await estadoPush(); } catch { e = { suportado: false }; }
+  let corpo;
+  if (!e.suportado) {
+    corpo = ehIphone && !instalado()
+      ? `<p class="sutil">No iPhone, as notificações só funcionam com o app na Tela de Início: toque em <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b> e abra o app pelo ícone.</p>`
+      : `<p class="sutil">Este navegador não aceita notificações. Abra o app pelo Chrome (Android) ou pelo ícone na Tela de Início (iPhone).</p>`;
+  } else if (e.permissao === "denied") {
+    corpo = `<p class="sutil">As notificações estão bloqueadas neste celular. Libere em <b>Ajustes → Notificações</b> do celular, procurando pelo app da barbearia.</p>`;
+  } else if (e.inscricao) {
+    if (papel === "barbeiro") { el.innerHTML = `<p class="pequeno-txt sutil" style="margin:0">🔔 Notificações ativadas neste celular · <a href="#" id="push-desativar" style="color:var(--sutil)">desativar</a></p>`; }
+    else corpo = `<p class="pos">🔔 Notificações ativadas neste celular.</p><button class="btn pequeno" id="push-desativar">Desativar</button>`;
+  } else {
+    corpo = `<p class="sutil">${msg}</p><button class="btn primario" id="push-ativar">🔔 Ativar notificações</button>`;
+  }
+  if (corpo) el.innerHTML = `<section class="cartao"><h3>Notificações</h3>${corpo}</section>`;
+  $("#push-ativar", el)?.addEventListener("click", async (ev) => {
+    ev.currentTarget.disabled = true;
+    try { await ativarPush(); aviso("Notificações ativadas!"); } catch (err) { aviso(err.message, true); }
+    desenharNotificacoes(el);
+  });
+  $("#push-desativar", el)?.addEventListener("click", async (ev) => {
+    ev.preventDefault();
+    await tentar(desativarPush);
+    desenharNotificacoes(el);
+  });
+}
 
 function ligarApagar(el, depois) {
   $$("[data-apagar]", el).forEach((b) => (b.onclick = async () => {

@@ -39,14 +39,17 @@ O plano grátis aguenta com folga o movimento de uma barbearia:
 
 Entre como dono e vá em **Cadastros → Barbeiros → Editar**. Defina um **PIN** de 4 a 6 números para cada barbeiro. Na tela de entrada, ele toca no próprio nome e digita o PIN.
 
-| O barbeiro pode | O barbeiro **não** pode |
-|---|---|
-| Lançar os próprios cortes (dinheiro, PIX, cartão, plano, fiado) | Lançar em nome de outro barbeiro |
-| Ver o próprio dia, a comissão e quanto falta receber | Ver o caixa geral, o lucro, os colegas, as contas e os backups |
-| Cadastrar cliente novo (nome e telefone) | Lançar entradas e saídas |
-| Apagar o que **ele mesmo** lançou **hoje** (para corrigir erro) | Apagar lançamento antigo ou de outra pessoa |
+Só o **dono** lança. O barbeiro só **consulta** os próprios números, numa tela única ("Meu painel"):
 
-O dono vê na hora tudo o que os barbeiros lançam. Para tirar o acesso de alguém, marque "Tirar o acesso dele ao app" ou desative o barbeiro. Ele perde o acesso na mesma hora.
+| O barbeiro vê | O barbeiro **não** pode |
+|---|---|
+| Cortes de hoje, quanto gerou e a comissão do dia | Lançar, apagar ou editar qualquer coisa |
+| Por semana, mês, ano ou tudo: cortes, quanto gerou, comissão e quanto falta receber | Ver o caixa, o lucro, os colegas, os clientes, as contas e os backups |
+| Mês a mês, os pagamentos e vales que recebeu e a lista dos cortes dele | |
+
+**Notificações:** no painel dele, o barbeiro toca em **🔔 Ativar notificações**. A partir daí, o celular dele avisa sempre que o dono lança um corte, pagamento, vale ou comissão extra no nome dele. No iPhone, isso só funciona com o app adicionado à Tela de Início e com iOS 16.4 ou mais novo.
+
+Para tirar o acesso de alguém, marque "Tirar o acesso dele ao app" ou desative o barbeiro. Ele perde o acesso na mesma hora.
 
 Depois de 6 PINs errados, o acesso daquele barbeiro fica travado por 15 minutos. Com a senha do dono acontece o mesmo depois de 8 erros. Isso impede que alguém fique chutando a senha.
 

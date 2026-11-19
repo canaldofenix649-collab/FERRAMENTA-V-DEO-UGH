@@ -1,5 +1,5 @@
 // Estrutura do banco. É criada sozinha no primeiro acesso (no Cloudflare e no computador).
-export const VERSAO_SCHEMA = 3;
+export const VERSAO_SCHEMA = 4;
 
 export const TABELAS = [
   `CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT)`,
@@ -49,6 +49,9 @@ export const TABELAS = [
   `CREATE TABLE IF NOT EXISTS metas (
     id TEXT PRIMARY KEY, titulo TEXT, tipo TEXT, meta REAL, descricao TEXT, inicio TEXT, termino TEXT,
     status TEXT, alcancada_em TEXT, colaborador_id TEXT REFERENCES colaboradores(id) ON DELETE SET NULL)`,
+  // celulares inscritos para receber notificações (colaborador_id NULL = dono)
+  `CREATE TABLE IF NOT EXISTS push_inscricoes (
+    endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, colaborador_id TEXT, criado_em TEXT)`,
   `CREATE TABLE IF NOT EXISTS agendamentos (
     id TEXT PRIMARY KEY, agendado_para TEXT, cliente_id TEXT REFERENCES clientes(id) ON DELETE SET NULL,
     colaborador_id TEXT REFERENCES colaboradores(id) ON DELETE SET NULL, status TEXT, observacoes TEXT)`,
