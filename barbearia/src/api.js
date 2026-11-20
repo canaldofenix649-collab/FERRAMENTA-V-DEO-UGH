@@ -498,22 +498,16 @@ async function apiBarbeiro(req, db, rota, m, q, colab) {
 
 // ---------- notificações dos lançamentos ----------
 const reais = (v) => "R$ " + (Math.round((Number(v) || 0) * 100) / 100).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-const FORMAS_TXT = { cash: "dinheiro", pix: "PIX", debit_card: "débito", credit_card: "crédito", plan: "plano", other: "outro" };
 
 /** O barbeiro recebe aviso quando o dono lança no nome dele:
  *  corte, pagamento de comissão, vale ou comissão extra. */
 async function notificarLancamento(db, t, origem) {
   if (!t?.colaborador_id) return;
-  const desc = t.descricao || "Serviço";
+  // mensagem curta: só o que mudou para o barbeiro e o valor
   let paraBarbeiro = null;
-  if (t.tipo === "service") {
-    const valor = t.forma_pagamento === "plan" ? "plano" : `${reais(t.valor)} no ${FORMAS_TXT[t.forma_pagamento] || "caixa"}`;
-    paraBarbeiro = { titulo: "Corte lançado pra você ✂️", corpo: `${desc} · ${valor} · sua comissão ${reais(t.comissao)}`, url: "/#meus" };
-  } else if (t.tipo === "expense" && t.categoria === "comissao_paga") {
-    paraBarbeiro = { titulo: `Você recebeu ${reais(t.valor)} 💰`, corpo: desc, url: "/#meus" };
-  } else if (t.tipo === "commission") {
-    paraBarbeiro = { titulo: `Comissão extra: ${reais(t.comissao)}`, corpo: desc, url: "/#meus" };
-  }
+  if (t.tipo === "service") paraBarbeiro = { titulo: "Nova comissão", corpo: reais(t.comissao), url: "/#meus" };
+  else if (t.tipo === "expense" && t.categoria === "comissao_paga") paraBarbeiro = { titulo: "Pagamento recebido", corpo: reais(t.valor), url: "/#meus" };
+  else if (t.tipo === "commission") paraBarbeiro = { titulo: "Comissão extra", corpo: reais(t.comissao), url: "/#meus" };
   if (!paraBarbeiro) return;
   // só para quem ainda tem acesso (ativo e com PIN): tirou o PIN ou desativou, os avisos param na hora
   const inscricoes = await db.all(`SELECT p.* FROM push_inscricoes p JOIN colaboradores c ON c.id = p.colaborador_id
