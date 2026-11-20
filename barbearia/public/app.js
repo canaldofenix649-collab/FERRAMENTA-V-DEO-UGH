@@ -197,7 +197,11 @@ function mostrarEntrada(e) {
     } catch (err) { $("#erro-entrada").textContent = err.message; }
   };
 }
-$("#btn-sair").onclick = async () => { await post("/logout"); history.replaceState(null, "", "/"); iniciar(); };
+$("#btn-sair").onclick = async () => {
+  // ao sair, este celular para de receber os avisos de quem estava logado
+  try { if ("serviceWorker" in navigator && "PushManager" in window) await desativarPush(); } catch {}
+  await post("/logout"); history.replaceState(null, "", "/"); iniciar();
+};
 
 // ---------- abas ----------
 const ABAS = {};

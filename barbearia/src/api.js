@@ -515,7 +515,10 @@ async function notificarLancamento(db, t, origem) {
     paraBarbeiro = { titulo: `Comissão extra: ${reais(t.comissao)}`, corpo: desc, url: "/#meus" };
   }
   if (!paraBarbeiro) return;
-  await enviarPush(db, await db.all("SELECT * FROM push_inscricoes WHERE colaborador_id = ?", [t.colaborador_id]), paraBarbeiro, origem);
+  // só para quem ainda tem acesso (ativo e com PIN): tirou o PIN ou desativou, os avisos param na hora
+  const inscricoes = await db.all(`SELECT p.* FROM push_inscricoes p JOIN colaboradores c ON c.id = p.colaborador_id
+    WHERE p.colaborador_id = ? AND c.ativo = 1 AND c.pin_hash IS NOT NULL`, [t.colaborador_id]);
+  await enviarPush(db, inscricoes, paraBarbeiro, origem);
 }
 /** Responde na hora e envia a notificação em segundo plano. */
 function responderLancamento(ctx, r) {
