@@ -3,7 +3,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { tratarApi, hojeBrasilia, agoraBrasilia } from "./src/api.js";
+import { tratarApi, hojeBrasilia, agoraBrasilia, personalizarManifest } from "./src/api.js";
 import { bancoLocal } from "./src/db-node.js";
 import { garantirSchema } from "./src/schema.js";
 
@@ -62,6 +62,11 @@ http.createServer(async (req, res) => {
       if (cookies.length) cab["set-cookie"] = cookies;
       res.writeHead(r.status, cab);
       return res.end(Buffer.from(await r.arrayBuffer()));
+    }
+    if (url.pathname === "/manifest.webmanifest") {
+      const r = await personalizarManifest(db, fs.readFileSync(path.join(PUBLIC, "manifest.webmanifest"), "utf8"));
+      res.writeHead(200, Object.fromEntries(r.headers));
+      return res.end(await r.text());
     }
     let arq = path.normalize(path.join(PUBLIC, decodeURIComponent(url.pathname)));
     if (!arq.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }

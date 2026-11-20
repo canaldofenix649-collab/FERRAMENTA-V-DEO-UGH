@@ -16,6 +16,17 @@ const enc = new TextEncoder();
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const deHex = (s) => new Uint8Array(s.match(/../g).map((h) => parseInt(h, 16)));
 
+/** Manifest do app com o nome da barbearia: é o nome que aparece no ícone e no "from" das notificações. */
+export async function personalizarManifest(db, texto) {
+  const m = JSON.parse(texto);
+  try {
+    await garantirSchema(db);
+    const nome = (await getConfig(db, "nome_barbearia"))?.trim();
+    if (nome) { m.name = nome; m.short_name = nome; }
+  } catch { /* banco ainda vazio: fica o nome padrão */ }
+  return new Response(JSON.stringify(m), { headers: { "Content-Type": "application/manifest+json; charset=utf-8", "Cache-Control": "no-cache" } });
+}
+
 export class Erro extends Error {
   constructor(status, msg) { super(msg); this.status = status; }
 }

@@ -145,13 +145,18 @@ const primeiroNome = (n) => (n || "").trim().split(/\s+/)[0];
 async function recarregarBase() {
   base = await api("/base");
   $("#nome-barbearia").textContent = base.nome;
-  document.title = base.nome + " · Gestão";
+  document.title = base.nome;
+  document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", base.nome);
 }
 
 // ---------- entrada ----------
 async function iniciar() {
   const e = await api("/estado");
   hoje = e.hoje;
+  if (e.nome) {
+    document.title = e.nome;
+    document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", e.nome);
+  }
   if (!e.logado) return mostrarEntrada(e);
   papel = e.papel; eu = e.eu; ambiente = e.ambiente || "local";
   await recarregarBase();
