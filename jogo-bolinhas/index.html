@@ -387,7 +387,8 @@ const W = 416, H = 660, GW = 96, PR = 10, BR = 5, FRAMES = 3600, DT = 1 / 60, SC
 const BOX_W = 240, BOX_D = 98, PEN_D = 66;
 const RUNW = { LAT: 1.15, PON: 1.18, MEI: 1.1, VOL: 1.05, CA: 1, ZAG: .85 };
 let STA_K = .025;
-let FOUL_P = .2, DEFLECT = .6, SHOT_D = 205, OFF_T = -8;
+let Q_K = .0065, DAY_SD = .025, DRIB = 1, HOME_K = 1.055;
+let FOUL_P = .2, DEFLECT = .6, SHOT_D = 240, OFF_T = -8;
 const D4 = [[.14,.80],[.38,.84],[.62,.84],[.86,.80]];
 const FORM = {
   '4-4-2':   [...D4, [.14,.62],[.38,.66],[.62,.66],[.86,.62], [.38,.53],[.62,.53]],
@@ -435,7 +436,8 @@ function createMatch(tA, tB, opts) {
   [tA, tB].forEach((t, s) => {
     const xi = lineup(t), f = formOf(t), fis = (t.staff && t.staff.fis) || 2;
     m.side[s] = { team: t, bench: benchOf(t, xi), subs: 0, fis,
-      fac: (m.home === s ? 1.03 : 1) * (.97 + (t.morale ?? 60) * .0006) * (1 + .008 * fis) * (m.weather === 'chuva' ? .97 : 1) * (xi.some(p => p.tr === 'lider') ? 1.01 : 1),
+      day: gauss() * DAY_SD,
+      fac: (m.home === s ? HOME_K : 1) * (.985 + (t.morale ?? 60) * .00025) * (1 + (ovr(t) - 76) * Q_K) * (1 + .008 * fis) * (m.weather === 'chuva' ? .97 : 1) * (xi.some(p => p.tr === 'lider') ? 1.01 : 1),
       noise: (1.3 - (t.chem ?? 70) / 100 * .5) * (1 - .12 * xi.filter(p => (p.ten || 0) >= 2).length / 11),
       drain: t.id === 'user' && typeof S !== 'undefined' && S && S.pre === 'fisico' ? .85 : 1 };
     const tac = t.tac || {}, sd0 = m.side[s];
@@ -444,6 +446,8 @@ function createMatch(tA, tB, opts) {
     if (sd0.press === 'alta') { sd0.fac *= 1.025; sd0.drain *= 1.2; } else if (sd0.press === 'recuada') sd0.drain *= .9;
     xi.forEach((p, i) => { const b = makeBody(m, s, i, p, f); if (m.derby && p.tr === 'classico') b.base *= 1.06; m.bodies.push(b); });
   });
+  for (const sd of m.side) sd.fac *= 1 + sd.day;
+  m.ch = [null, null];
   m.kits = pickKits(tA, tB, m.home);
   m.pitch = pitchOf(m.home != null ? [tA, tB][m.home] : null);
   for (const sd of m.side) sd.drain *= m.pitch.k;
@@ -563,6 +567,14 @@ function kick(m, b, mode) {
     const tx = W / 2 + rnd(-55, 55), ty = g.y - d * rnd(20, 70);
     shoot(m, b, tx, ty, clamp(dist(ball, { x: tx, y: ty }) * 1.6, 240, 440) / SC, p.pas, 1.2);
     m.cross = { side: s, until: m.t + 70 }; if (Math.random() < .4) say(m, `${p.name} cruza na área!`, 'cross'); return;
+  }
+  if (!mode && !b.gk) {
+    let nd = 1e9; for (const o of m.bodies) if (o.side !== s) { const q = dist(o, ball); if (q < nd) nd = q; }
+    const dribP = DRIB * (sd.style === 'contra' ? .55 : sd.style === 'posse' ? .35 : .45) * (.6 + p.dri / 200);
+    if (nd > 36 && Math.random() < dribP) {
+      const lat = (W / 2 - ball.x) * .15 + rnd(-22, 22);
+      shoot(m, b, ball.x + lat, ball.y + d * 60, 128 + p.dri * .5, 60 + p.dri * .4); b.cd = .3; return;
+    }
   }
   const fw = mates.filter(o => (o.y - ball.y) * d > 24);
   if (fw.length && (Math.random() < (sd.style === 'posse' ? .72 : sd.style === 'contra' ? .6 : .5) || mode)) {
@@ -717,6 +729,9 @@ function step(m) {
       const dd = (b.x - ball.x) ** 2 + (b.y - ball.y) ** 2;
       if (dd < d1) { b2 = b1; d2 = d1; b1 = b; d1 = dd; } else if (dd < d2) { b2 = b; d2 = dd; }
     }
+    const cur = m.ch[s];
+    if (cur && cur !== b1 && !cur.gk && m.bodies.includes(cur)) { const dc = (cur.x - ball.x) ** 2 + (cur.y - ball.y) ** 2; if (dc < d1 * 1.8 + 300) { b2 = b1; b1 = cur; } }
+    m.ch[s] = b1;
     if (b1) b1.role = 'chase'; if (b2) b2.role = 'support';
   }
   if (m.lastTouch) m.st[m.lastTouch.side].pos++;
@@ -741,11 +756,12 @@ function step(m) {
       ty = bp.y + (ball.y - H / 2) * .5 + d * (m.tactic[s] + (m.side[s].shift || 0)) * 36;
       if (r === 'support') { tx = ball.x * .5 + bp.x * .5; ty = ball.y + d * 80 + d * m.tactic[s] * 12; }
       else if (b.idx > 0 && FORM[formOf(m.teams[s])][b.idx - 1][1] < .58 && (ball.y - H / 2) * d < 40) { if (b.offT == null || m.t % 120 === b.idx * 7) b.offT = rnd(OFF_T - 12, OFF_T + 8); const ln = lines[1 - s]; ty = ty * .1 + (ln - d * b.offT) * .9; }
+      if (r !== 'support') { tx += Math.sin(m.t * .021 + b.idx * 1.7 + s * 3) * 8; ty += Math.cos(m.t * .017 + b.idx * 2.3 + s) * 7; }
       tx = clamp(tx, PR, W - PR); ty = clamp(ty, PR + 10, H - PR - 10);
     }
     const dx = tx - b.x, dy = ty - b.y, dl = Math.hypot(dx, dy) || 1;
     const spd = b.base * m.side[s].fac * (.7 + .3 * b.sta / 100) * boost;
-    const sp = spd * Math.min(1, dl / 14), k = Math.min(1, DT * 7);
+    const sp = spd * Math.min(1, dl / (r === 'chase' || b.gk ? 14 : 30)), k = Math.min(1, DT * (r === 'chase' || b.gk ? 7 : 4.5));
     b.vx += (dx / dl * sp - b.vx) * k; b.vy += (dy / dl * sp - b.vy) * k;
     b.x += b.vx * DT; b.y += b.vy * DT; b.cd -= DT; b.saveCd -= DT;
     const fis = m.side[s].fis, run = Math.min(1, Math.hypot(b.vx, b.vy) / (b.base || 1));
@@ -763,7 +779,7 @@ function step(m) {
       gk.saveCd = .5;
       const sh = m.lastShot && m.t - m.lastShot.t < 120 ? m.lastShot.b.p.chu : 60;
       if (!(m.lastShot && m.t - m.lastShot.t < 120)) continue;
-      if (Math.random() < clamp(.45 + (gk.p.ref - sh) / 120, .2, .9)) {
+      if (Math.random() < clamp(.37 + (gk.p.ref - sh) / 120, .2, .9)) {
         if (m.lastShot && m.lastShot.b.side !== gk.side && m.t - m.lastShot.t < 120) { m.st[m.lastShot.b.side].onT++; m.lastShot = null; }
         if (Math.random() < .35) { ball.vx = 0; ball.vy = 0; ball.x = gk.x; ball.y = gk.y - ad(gk.side) * (PR + BR); gk.cd = .6; say(m, `Defesa de ${gk.p.name}! Segura firme.`, 'save'); }
         else { ball.vx = (ball.x < gk.x ? -1 : 1) * sp * .55; ball.vy = Math.sign(og.y - ball.y || 1) * sp * .2; say(m, `${gk.p.name} espalma!`, 'save'); }
@@ -1463,6 +1479,7 @@ function afterMatch(m) {
     }
     const gf = res[s], ga = res[1 - s], dm = m.derby ? 1.8 : 1, lider = [...m.played.keys()].some(p => p.tr === 'lider' && t.players.includes(p));
     t.morale = clamp((t.morale ?? 60) + (gf > ga ? 7 * dm : gf < ga ? (-7 + st.aux * .8) * dm * (lider ? .6 : 1) : 1), 5, 100);
+    t.morale += (62 - t.morale) * .12;
     for (const p of m.played.keys()) if (t.players.includes(p)) HI(p).apps++;
     if (t.id === 'user') {
       const avgXI = lineup(t).reduce((a, p) => a + pOvr(p), 0) / 11;
@@ -3069,7 +3086,7 @@ function loop(now) {
   else if (pauseF > 0) pauseF = Math.max(0, pauseF - f);
   else if (!M.over && !panel) {
     acc += f * speed; let n = Math.min(Math.floor(acc), 16); acc -= Math.floor(acc);
-    while (n-- > 0 && !M.over && pauseF <= 0) step(M);
+    while (n-- > 0 && !M.over && pauseF <= 0) { for (const b of M.bodies) { b.ox = b.x; b.oy = b.y; } M.ball.ox = M.ball.x; M.ball.oy = M.ball.y; step(M); }
   }
   if (flash && !replay) { flash.t -= f; if (flash.t <= 0) flash = null; }
   updateBoard(); draw();
@@ -3225,14 +3242,15 @@ function draw() {
   if (!BG) BG = buildBg(m);
   c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(BG, 0, 0);
   c.setTransform(k, 0, 0, k, MX * k, MY * k);
-  let bx = m.ball.x, by = m.ball.y, list = null, frame = null;
+  const al = pauseF > 0 || m.freeze > 0 ? 1 : acc, ip = (o, a) => o['o' + a] == null || Math.abs(o[a] - o['o' + a]) > 30 ? o[a] : o['o' + a] + (o[a] - o['o' + a]) * al;
+  let bx = ip(m.ball, 'x'), by = ip(m.ball, 'y'), list = null, frame = null;
   if (replay) { frame = replay.frames[Math.floor(replay.i)]; list = frame.b; [bx, by] = frame.ball; }
   const n = list ? list.length : m.bodies.length;
   c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath();
-  for (let i = 0; i < n; i++) { const x = list ? list[i][1] : m.bodies[i].x, y = list ? list[i][2] : m.bodies[i].y; c.moveTo(x + 2 + PR, y + 3); c.ellipse(x + 2, y + 3, PR, PR * .85, 0, 0, 7); }
+  for (let i = 0; i < n; i++) { const x = list ? list[i][1] : ip(m.bodies[i], 'x'), y = list ? list[i][2] : ip(m.bodies[i], 'y'); c.moveTo(x + 2 + PR, y + 3); c.ellipse(x + 2, y + 3, PR, PR * .85, 0, 0, 7); }
   c.moveTo(bx + 1.5 + BR, by + 2); c.ellipse(bx + 1.5, by + 2, BR, BR * .8, 0, 0, 7); c.fill();
   for (let i = 0; i < n; i++) {
-    const b = list ? list[i][0] : m.bodies[i], x = list ? list[i][1] : b.x, y = list ? list[i][2] : b.y;
+    const b = list ? list[i][0] : m.bodies[i], x = list ? list[i][1] : ip(b, 'x'), y = list ? list[i][2] : ip(b, 'y');
     c.drawImage(sprite(m, b), x - SPR_S / 2, y - SPR_S / 2, SPR_S, SPR_S);
     if (b.yc) { c.fillStyle = '#ffd23f'; c.fillRect(x + 4, y - 9, 3, 4); }
   }
@@ -3292,7 +3310,7 @@ $('help').addEventListener('click', () => { if (!S || S.fired) return; tab = 'ho
 /* instalar como aplicativo (funciona quando o jogo é hospedado com o manifest e o service worker da pasta) */
 try { if (location.protocol === 'https:' && !/claude/.test(location.hostname)) { const l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.webmanifest'; document.head.appendChild(l); if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {}); } } catch (e) {}
 
-window.__liga = { setSta: k => { STA_K = k; }, runMatch, makeSquad, makeTeam, createMatch, step, get S() { return S; } };
+window.__liga = { setSta: k => { STA_K = k; }, tune: o => { if (o.q != null) Q_K = o.q; if (o.day != null) DAY_SD = o.day; if (o.drib != null) DRIB = o.drib; if (o.shot != null) SHOT_D = o.shot; if (o.home != null) HOME_K = o.home; }, runMatch, ovr, T: id => S.teams[id], makeSquad, makeTeam, createMatch, step, get S() { return S; } };
 if (S && !S.fired) { advanceAuto(); save(); }
 render();
 })();
