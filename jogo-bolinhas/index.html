@@ -955,55 +955,108 @@ const STATES = {
 const _ = null;
 /* titulares reais: goleiro, lateral, zagueiro, zagueiro, lateral, volante, volante, meia, meia, ponta, centroavante */
 const REAL_POS = ['GOL', 'LAT', 'ZAG', 'ZAG', 'LAT', 'VOL', 'VOL', 'MEI', 'MEI', 'PON', 'CA'];
+/* elencos reais (temporada 2026), 11 titulares no 4-2-3-1 e 5 reservas: GOL, ZAG, LAT, MEI, CA; null = nome gerado */
 const SQUADS = {
-  FLA: ['Rossi','Varela','Léo Ortiz','Léo Pereira','Alex Sandro','Jorginho','Pulgar','De la Cruz','Arrascaeta','Samuel Lino','Pedro'],
-  PAL: ['Weverton','Giay','Gustavo Gómez','Murilo','Piquerez','Aníbal Moreno','Andreas Pereira','Raphael Veiga','Felipe Anderson','Vitor Roque','Flaco López'],
-  BOT: ['John','Vitinho','Barboza','Bastos','Alex Telles','Danilo','Marlon Freitas','Savarino','Matheus Martins','Artur','Arthur Cabral'],
-  CRU: ['Cássio','William','Jonathan Jesus','Villalba','Kaiki','Lucas Romero','Lucas Silva','Christian','Matheus Pereira','Wanderson','Kaio Jorge'],
-  FLU: ['Fábio','Samuel Xavier','Thiago Silva','Freytes','Renê','Martinelli','Hércules','Nonato','Ganso','Canobbio','Germán Cano'],
-  SAO: ['Rafael','Cédric','Arboleda','Alan Franco','Wendell','Pablo Maia','Marcos Antônio','Alisson','Luciano','Lucas Moura','Calleri'],
-  CAM: ['Everson','Natanael','Junior Alonso','Lyanco','Guilherme Arana','Alan Franco','Fausto Vera','Gustavo Scarpa','Igor Gomes','Hulk','Rony'],
-  INT: ['Rochet','Aguirre','Vitão','Juninho','Bernabei','Thiago Maia','Bruno Henrique','Alan Patrick','Carbonero','Vitinho','Borré'],
-  COR: ['Hugo Souza','Matheuzinho','Gustavo Henrique','André Ramalho','Hugo','Raniele','Breno Bidon','Garro','Carrillo','Memphis','Yuri Alberto'],
-  BAH: ['Marcos Felipe','Gilberto','Gabriel Xavier','Kanu','Luciano Juba','Caio Alexandre','Jean Lucas','Everton Ribeiro','Cauly','Erick Pulga','Willian José'],
-  GRE: ['Tiago Volpi','João Pedro','Kannemann','Wagner Leonardo','Marlon','Dodi','Villasanti','Edenilson','Cristaldo','Amuzu','Braithwaite'],
-  RBB: ['Cleiton','Andrés Hurtado','Pedro Henrique','Guzmán Rodríguez','Juninho Capixaba','Gabriel','Eric Ramires','Jhon Jhon','Vinicinho','Sasha','Pitta'],
-  VAS: ['Léo Jardim','Paulo Henrique','Lucas Freitas','Robert Renan','Lucas Piton','Hugo Moura','Tchê Tchê','Coutinho','Nuno Moreira','Rayan','Vegetti'],
-  SAN: ['Brazão','Igor Vinícius','Zé Ivaldo','Luan Peres','Escobar','Zé Rafael','João Schmidt','Rollheiser','Barreal','Guilherme','Neymar'],
-  MIR: ['Walter','Lucas Ramon','João Victor','Jemmes','Reinaldo','Neto Moura','Danielzinho','Shaylon','Chico Kim','Negueba','Carlos Eduardo'],
-  CAP: ['Santos','Gilberto','Habraão','Lucas Belezi','Claudinho','Portilla','Zapelli','Chiqueti','Dudu Kogitzki','Mendoza','Viveros'],
-  VIT: ['Lucas Arcanjo','Raúl Cáceres','Neris','Lucas Halter','Jamerson','Ronald','Baralhas','Matheuzinho','Osvaldo','Erick','Renato Kayzer'],
-  CFC: ['Pedro Morisco',_,_,_,_,'Willian Oliveira','Josué','Clayson','Lucas Ronier',_,'Pedro Rocha'],
-  CHA: ['Anderson',_,'Fabrício Bruno',_,_,_,'Jean Carlos',_,'Walter Clar',_,'Bruno Rangel'],
-  REM: ['Marcelo Rangel',_,'Marllon','Banguera',_,'Cantillo','Poveda','Jajá','Diego Hernández','Yago Pikachu','Alef Manga'],
+  "Flamengo": ["Rossi", "Varela", "Léo Ortiz", "Léo Pereira", "Alex Sandro", "Jorginho", "Erick", "De la Cruz", "Arrascaeta", "Samuel Lino", "Pedro", "Andrew", "Danilo", "Ayrton Lucas", "Saúl", "Luiz Araújo"],
+  "Palmeiras": ["Carlos Miguel", "Giay", "Gustavo Gómez", "Murilo", "Piquerez", "Marlon Freitas", "Andreas Pereira", "Maurício", "Felipe Anderson", "Vitor Roque", "Flaco López", "Marcelo Lomba", "Alexander Barboza", "Jefté", "Lucas Evangelista", "Paulinho"],
+  "Botafogo": ["Gabriel Batista", "Vitinho", "Arthur Chaves", "Ferraresi", "Alex Telles", "Danilo", "Cristian Medina", "Montoro", "Matheus Martins", "Júnior Santos", "Arthur Cabral", "Warleson", "Anthony", "Mateo Ponte", "Allan", "Tiquinho Soares"],
+  "Cruzeiro": ["Cássio", "William", "Jonathan Jesus", "Fabrício Bruno", "Kauã Moraes", "Lucas Romero", "Lucas Silva", "Felipe Morais", "Matheus Pereira", "Wanderson", "Kaio Jorge", "Léo Aragão", "João Marcelo", "Matías Viña", "João Costa", "Bruno Rodrigues"],
+  "Fluminense": ["Fábio", "Samuel Xavier", "Thiago Silva", "Freytes", "Renê", "Martinelli", "Hércules", "Nonato", "Ganso", "Canobbio", "Germán Cano", "Marcelo Pitaluga", "Ignácio", "Guilherme Arana", "Savarino", "Hulk"],
+  "São Paulo": ["Rafael", "Iago Borduchi", "Arboleda", "Domingos Duarte", "Wendell", "Pablo Maia", "Marcos Antônio", "Pedro Ferreira", "Luciano", "Lucas Moura", "Calleri", "Rafael", "Sabino", "Lucas Ramon", "Djhordney", "Ferreira"],
+  "Atlético-MG": ["Everson", "Natanael", "Léo Duarte", "Lyanco", "Renan Lodi", "Alan Franco", "Alexsander", "Gustavo Scarpa", "Igor Gomes", "Mateo Cassierra", "Thiago Borbas", "Gabriel Delfim", "Ruan Tressoldi", "Kauã Pascini", "Fred", "Alan Minda"],
+  "Internacional": ["Rochet", "Aguirre", "Guillermo Maripán", "Juninho", "Bernabei", "Thiago Maia", "Bruno Henrique", "Alan Patrick", "Carbonero", "Vitinho", "Alerrandro", "Anthoni", "Félix Torres", "Matheus Bahia", "Niclas Eliasson", "Kayky"],
+  "Corinthians": ["Hugo Souza", "Matheuzinho", "Gustavo Henrique", "André Ramalho", "Hugo", "Raniele", "Breno Bidon", "Garro", "Carrillo", "Memphis", "Yuri Alberto", "Felipe Longo", "Gabriel Paulista", "Pedro Milans", "Matheus Pereira", "Vitinho"],
+  "Bahia": ["Ronaldo", "Marcos Victor", "Marco Moreno", "Kanu", "Luciano Juba", "Caio Alexandre", "Jean Lucas", "Éverton Ribeiro", "Rodrigo Nestor", "Erick", "Willian José", "Guido Herrera", "Román Gómez", "Zé Guilherme", "David Martins", "Ademir"],
+  "Grêmio": ["Tiago", "João Pedro", "Kannemann", "Wagner Leonardo", "Marlon", "Dodi", "Villasanti", "Krovinović", "Roger", "Amuzu", "Braithwaite", "Weverton", "Balbuena", "Marcos Rocha", "Riquelme", "Pavon"],
+  "Bragantino": ["Cleiton", "Andrés Hurtado", "Eduardo Santos", "Guzmán Rodríguez", "Juninho Capixaba", "Gabriel", "Ramires", "Jhon Jhon", "Vinicinho", "Sasha", "Pitta", "Fernando Costa", "Alix Vinicius", "Vanderlan", "Gustavo Neves", "Fernando"],
+  "Vasco": ["Léo Jardim", "Paulo Henrique", "Lucas Freitas", "Robert Renan", "Lucas Piton", "Santiago Sosa", "Tchê Tchê", "Jair", "Nuno Moreira", "David", "Facundo Colidio", "Daniel Fuzato", "Alan Saldivia", "Puma Rodríguez", "Johan Rojas", "Andrés Gómez"],
+  "Santos": ["Brazão", "Igor Vinícius", "Lucas Veríssimo", "Luan Peres", "Escobar", "Arthur", "João Schmidt", "Rollheiser", "Barreal", "Everton", "Neymar", "Diógenes", "João Ananias", "Vinicius Lira", "Gabriel Bontempo", "Gabriel Barbosa"],
+  "Mirassol": ["Walter", "Lucas Oliveira", "João Victor", "Willian Machado", "Reinaldo", "Neto Moura", "Japa", "Shaylon", "Chico Kim", "Negueba", "Eduardo", "Georgemy", "Elias", "Victor Luis", "Denilson", "Zé Roberto"],
+  "Athletico-PR": ["Santos", "Gilberto", "Léo", "Arthur Dias", "Claudinho", "Portilla", "Zapelli", "Chiqueti", "Dudu Kogitzki", "Mendoza", "Viveros", "Mycael", "Carlos Terán", "Léo Derik", "João Cruz", "Isaac"],
+  "Vitória": ["Lucas Arcanjo", "Ramon", "Emanuel Brítez", "Camutanga", "Jamerson", "Tomás Pochettino", "Baralhas", "Matheuzinho", "Osvaldo", "Erick", "Renato Kayzer", "Gabriel", "Riccieli", "Luan Cândido", "Lucas Silva", "Marinho"],
+  "Coritiba": ["Pedro Morisco", "Tinga", "Maicon", "Moledo", "Felipe Jonathan", "Nicolás Fonseca", "Josué", "Vini Paulista", "Lucas Ronier", "Joaquín Lavega", "Pedro Rocha", "Keiller", "Tiago Cóser", "Fabricio Bustos", "Gustavo Silva", "Brian Ocampo"],
+  "Chapecoense": ["Anderson", "Heitor", "Doma", "João Paulo", "Mancha", "Bruno Matias", "Vinicius Balieiro", "Robert", "Giovanni Augusto", "Marcinho", "Túlio Eduardo", "Gabriel Werner", "Rafael Thyere", "Fernando", "David Antunes", "Yannick Bolasie"],
+  "Remo": ["Marcelo Rangel", "João Lucas", "Marllon", "Matheus Felipe", "Marlon", "Vitor Bueno", "Poveda", "Jajá", "Patrick", "Yago Pikachu", "Gabriel Taliari", "Alexandre", "Léo Andrade", "Duplexe Tchamba", "Jáderson", "Antonio Galeano"],
+  "Fortaleza": ["João Ricardo", "Kaio Henrique", "Lucas Gazal", "Luan Freitas", "Maurício Mucuri", "Pierre", "Jailson", "Ronald", "Lucas Crispim", "Juan Miritello", "Vitinho", "Vinicius Silvestre", "Tomás Cardona", "Gabriel Fuentes", "Lucas Emanoel", "Pedro Henrique"],
+  "Ceará": ["Richard", "Rafael Ramos", "Thalisson", "Luizão", "Sávio", "Zanocelo", "Richardson", "Matheus Araújo", "Lucas Mugni", "Renzo López", "Nicolás Ferreira", "Matheus Nogueira", "Luiz Otávio", "Sanchez", "Vina", "Melk"],
+  "Sport": ["Denis", "Felipinho", "Marcelo Ajul", "Marcelo Benevenuto", "Rafinha", "Willian Oliveira", "Pedro Martins", "Biel Fonseca", "Patrick de Paula", "Pedro Perotti", "Neto Pessoa", "Brenno", "Kayky Almeida", "Augusto Pucci", "Juan Alano", "Diego Hernández"],
+  "Novorizontino": ["Lucas Ribeiro", "Madson", "Carlinhos", "Patrick", "Iván Alvariño", "Tavinho", "Léo Naldi", "Luís Oyama", "Rômulo", "Ronald Barcellos", "Tití Ortiz", "João Scapin", "Sander", "Gabriel Bahia", "Matheus Bianqui", "Carlão"],
+  "Goiás": ["Thiago Rodrigues", "Rodrigo Soares", "Luiz Felipe", "Ramon Menezes", "Nicolas Vichiatto", "Filipe Machado", "Lucas Rodrigues", "Juninho", "Lucas Lima", "Anselmo Ramon", "Felipe Clemente", "Tadeu", "Lucas Ribeiro", "Danilo Cunha", "Gegê", "Esli García"],
+  "Juventude": ["Pedro Rocha", "Raí Ramos", "Titi", "Messias", "Wadson", "Luan Martins", "Lucas Mineiro", "Paulo Roberto", "Leo Índio", "Alan Kardec", "Marcos Paulo", "Ruan Carneiro", "Schaffer", "Diogo Barbosa", "Mandaca", "Fábio Lima"],
+  "Cuiabá": ["João Carlos", "Igor Inocêncio", "Vitor Mendes", "Eric Melo", "João Basso", "Calebe", "Wesley Dias", "Pepê", "David Miguel", "Ramon", "Eliel", "Gustavo Busatto", "Alan Empereur", "Lorenzo", "Marcos Júnior", "Rodrigo Rodrigues"],
+  "Atlético-GO": ["Paulo Vítor", "Dudu", "Adriano Martins", "Pedro Henrique", "Ruan", "Luizão", "Ezequiel Ham", "Robert", "Kauan", "Kelvin", "Daniel", "Vladimir", "Natã Felipe", "Raí Ramos", "Shaylon", "Federico Martínez"],
+  "América-MG": ["Gustavo", "Emerson Santos", "Luca Sosa", "Rafa Barcelos", "Heitor", "Fernando Elizari", "Otávio Gonçalves", "Gabriel Domingos", "Felipe Amaral", "Guilherme Parede", "Willian Bigode", "William", "Alex Silva", "Manoel", "Alê", "Gonzalo Mastriani"],
+  "Avaí": ["Igor Bohn", "Wallison", "Allyson", "Gabriel Simples", "João Vitor", "Romildo Del Piage", "Hyan", "Luiz Henrique", "Jean Lucas", "Léo Chú", "Léo Gamalho", "Otávio Passos", "Guilherme Aquino", "Douglas Teixeira", "Daniel Penha", "Felipe Vizeu"],
+  "Criciúma": ["Alisson", "Marcinho", "Rodrigo", "Luciano Castán", "Marcelo Hermes", "Eduardo", "Thiaguinho", "Fellipe Mateus", "Gui Lobo", "Nicolas", "Jhonata Robert", "Airton", "Octávio Henrique", "Willean Lepo", "Ronald", "Romarinho"],
+  "CRB": ["Vitor Caetano", "Kevin", "Fábio Alemão", "Ruy", "Reverson", "Geovane", "Luizão", "Crystopher", "Danielzinho", "Douglas Baggio", "João Neto", "Matheus Albino", "Hereda", "Bressan", "Guilherme Estrella", "Guilherme Pato"],
+  "Operário-PR": ["Elias Curzel", "Mikael Doka", "William Klaus", "João Gabriel", "Moraes Júnior", "Índio", "Matheus Trindade", "Juan Zuluaga", "Gabriel Boschilia", "Ángel Torres", "Vinícius Mingotti", "Talles", "Gabriel Feliciano", "Miranda", "Vinícius Diniz", "Aylon"],
+  "Vila Nova": ["Helton Leite", "Higor Luiz", "Tiago Pagnussat", "Douglas Mendes", "Willian Formiga", "João Vieira", "Dudu", "Willian Maranhão", "Marquinhos Gabriel", "André Luis", "Lincoln", "Dalberson", "Anderson Jesus", "Igor Cariús", "Nathan Camargo", "Ryan"],
+  "Ponte Preta": ["Guilherme Viana", "Júlio", "Lucas Cunha", "Diego Leão", "Jota", "Rodrigo Souza", "Denis", "André Lima", "Élvis", "Emanuell Ferreira", "Brandão", "Vinicius Ferrari", "Danilo Barcelos", "Diego Porfírio", "Karl", "David da Hora"],
+  "Botafogo-SP": ["Victor Souza", "Jonathan", "Ericson", "Gustavo Vilar", "Wallace", "Marco Antônio", "Thiaguinho", "Everton Morelli", "Rafael Gava", "Kelvin", "Hygor", "Jordan", "Carlos Eduardo", "Gabriel Inocêncio", "Matheus Sales", "Guilherme Queiróz"],
+  "Náutico": ["Muriel", "Arnaldo", "Betão", "Matheus Ribeiro", "Ryan Carlos", "Auremir", "Léo Oliveira", "Wenderson", "Jean Carlos", "Vinícius", "Paulo Sérgio", "Gastón Guruceaga", "Igor Fernandes", "Índio", "Felipe Redaelli", "Victor Andrade"],
+  "Londrina": ["Luan Ribeiro", "Nino Paraíba", "Wallace", "Gabriel Lacerda", "Rafael Monteiro", "Tárik", "Juninho", "Victor Feitosa", "Lucas Marques", "Vitinho Mota", "Gilberto", "Zanella", "Kevyn Lucas", "André Dhominique", "André Cardoso", "Pablo Dyego"],
+  "Athletic": ["Luan Polli", "Douglas Pelé", "Gabriel Ferreira", "Sidimar", "Nathan", "Diego Fumaça", "Andrey", "David Braga", "Alason Carioca", "Welinton Torrão", "Lincoln", "Eduardo Freire", "Marcelo Ajul", "Rodrigo Gelado", "Amorim", "Ezequiel"],
+  "São Bernardo": ["Alex Alves", "Hugo Sanches", "Hélder Maciel", "Augusto", "Mário Sérgio", "Romisson", "Lucas Lima", "Dudu Miraíma", "Breno Melo", "Echaporã", "Fabrício Daniel", "Junior Oliveira", "Matheus Salustiano", "Anderson Pará", "Hyoran", "Lucas Rian"],
+  "Paysandu": ["Jean Drosny", "Edílson", "Iarley", "Bruno Bispo", "Matheus Capixaba", "Caio Mello", "Marcinho", "Henrique Salomoni", "Brian Macapá", "Ítalo Carvalho", "Peu", "Gabriel Mesquita", "Castro", "Cauã Dias", "Tiago Índio", "Thayllon"],
+  "Guarani": ["Mateus Claus", "Rian", "Edson Rogério", "Maurício Antônio", "Yan Henrique", "Isaque", "Kauã Jesus", "Carlos Eduardo", "Igor Pereira", "Kewen", "Lucca", "Andrey Ventura", "Rafael Donato", "Ynaiã", "Nathan Melo", "Rafael Freitas"],
+  "Santa Cruz": ["Thiago Coelho", "Thiago Ennes", "Eurico", "William Alves", "Alex Ruan", "Pedro Favela", "Andrey", "Fabinho", "Arilson", "Matheus Cadorini", "Cassiano Bouzon", "Rokenedy", "Zé Mário", "Matheus Vinícius", "Matheus Melo", "Ronald"],
+  "Figueirense": ["Fabrício", "Arthur Henrique", "Zé Luiz", "Jhonnathan", "Wesley Costa", "Pedro Melo", "Nicolas Porto", "Breno", "Léo Renz", "Arthur Martins", "Thyerry", "Antônio", "Léo Maia", null, "Flávio", null],
+  "Amazonas": ["João Lopes", "Iury", "Joílson", "Bruno Ramires", "Raylison", "Júlio Simas", "Guga", "Jhonny Lucas", "Phillipe Guimarães", "Adrien Graffin", "Ronan", "Renan", "Marcondes", "Iverton", "Riquelme", "Kauê Fernandes"],
+  "Ferroviária": ["Dênis Júnior", "Lucas Rodrigues", "Ronaldo Alves", "Gustavo Medina", "Kevin", "Ricardinho", "Netinho", "Rodrigo Alencar", "Ian Luccas", "Carlão", "Wesley Pomba", "Léo Wall", "Maycon", "Zé Mário", "Albano", "Quirino"],
+  "Volta Redonda": ["Avelino", "Wellington Silva", "Lucas Adell", "Fabrício", "Jean Victor", "Bruno Barra", "Juliano Fabro", "Dener", "Luciano Naninho", "Marquinhos", "Yamilo Zuniga", "Heitor Silva", "Lucas Rocha", "Alan Ferreira", "Bernardo Carvalho", "Matheus Régis"],
+  "Ituano": ["Lucas Wingert", "Guilherme Dal Pian", "Lucas Dias", "Matheus Mancini", "Thassio", "Lucas Stefanello", "Victor Silva", "Guilherme Xavier", "Marthã", "Léo Passos", "Neto Berola", "Saulo", "Léo Coltro", "Lucas Mota", "Lipe", "Bruno Alves"],
+  "Botafogo-PB": ["Leandro Nink", "Diogo Mateus", "Yan Souto", "Saimon Tormen", "Patric Calmon", "Jhonata Varela", "Giovanni Piccolomo", "Igor Maduro", "Nenê", "Dudu Hatamoto", "Kayon", "Max Walef", "Diego Tavares", "Bull", "Thallyson", "Jonas Toró"],
+  "Caxias": ["Marcelo Dal Soler", "Vitor Gabriel", "Ianson", "Mancha", "Roberto", "Breno Santos", "Grígor", "Marcelo Freitas", "Matheus Anjos", "Dentinho", "Diego Quirino", "Gabriel Toebe", "Maurício", "Windson", "Ravanelli", "Vitor Feijão"],
+  "Brusque": ["Matheus Nogueira", "Jeferson", "João Maistro", "Cipriano", "Raimar", "Bernardo Lemes", "Leonardo", "Gazão", "Jonatan Lucca", "Marlyson", "João Pedro", "Paulo Gianezini", "Ryan Santos", "Davi Gabriel", "Ariel Palácio", "Petterson Novaes"],
+  "Confiança": ["Matheus Emiliano", "Valdir", "Lucas Cunha", "Ícaro", "Mateus Ludke", "Gabriel Zeca", "Lorran", "Guilherme Nunes", "Madison", "Welder", "Maikon Aquino", "Cadu", "Eduardo Moura", "Adryan", "Moisés", "Luiz Thiago"],
+  "Ypiranga-RS": ["Edu Araújo", "Cleiton", "Willian Gomes", "Reinaldo", "Walce", "Robson Lopes", "Ramon Vinicius", "Léo Rafael", "Allison", "Felipe Ferreira", "Vinicius Charopem", "Zé Carlos", "Léo Gobo", "Wesllen", "Lucas Ramos", "Pedro Lucas"],
+  "Maringá": ["Gabriel Affonso", "Gabriel Souza", "Gabriel Santos", "Wendel Lomar", "Thiago Rosa", "Kelvi Gomes", "Lucas Bonifácio", "Adeílson Maranhão", "Danielzinho", "Edison Negueba", "Giovane Gomes", "Romário", "Felipe", "Keven", "Bruno Cheron", "Guilherme Pira"],
+  "Inter de Limeira": ["Saulo", "Yan Silva", "Lucas Santos", "Nassom", "João Victor", "Ronaldo Henrique", "Lucas Buchecha", "Luiz Guilherme", "Claudinho", "Rafael Oller", "Miguel Bianconi", "Pedro Nagel", "Gabriel Dias", "Juan Tavares", "Gustavo Bochecha", "Robinho"],
+  "Itabaiana": ["Jefferson", "Gustavo Fagundes", "Ligger", "Yann Motta", "Gustavo Cintra", "Ricardo Cerqueira", "Renatinho", "Dyego", "Fabrício Moura", "Everton Kanela", "Leilson", "Léo Souza", "Lucas Rafael", "Tito", "Cleiton", "Luan Silva"],
+  "Maranhão": ["Jean", "Ball", "Edson Fernando", "Iran", "Lucas Santos", "Railson", "Luis Gustavo", "Jorge Rocha", "Vagalume", "Felipe Sales", "Erverson", "Cauê", "Almeida", "Lucão", "Pedro Lucas", "Pimentinha"],
+  "Barra": ["Matheus Keyser", "Vitão", "Éverton Alemão", "Léo Duarte", "João Vinícius", "Elvinho", "Rick", "Barba", "Matheus Barbosa", "Giovani Albuquerque", "Renan Bernabé", "Luiz Fabiano", "Jackson", "Augusto Potiguar", "Marquinho", "Betinho"],
 };
 /* idades reais na temporada 2026 (pelo ano de nascimento), na ordem dos titulares; null = sorteada */
 const AGES = {
-  FLA: [31, 33, 30, 30, 35, 35, 32, 29, 32, 27, 29],
-  PAL: [39, 22, 33, 29, 28, 27, 30, 31, 33, 21, 26],
-  BOT: [30, 27, 31, 35, 34, 30, 31, 29, 23, 28, 28],
-  CRU: [39, 31, 28, 32, 23, 32, 33, 25, 30, 27, 24],
-  FLU: [46, 36, 42, 26, 34, 25, 25, 28, 37, 28, 38],
-  SAO: [37, 35, 35, 30, 33, 24, 26, 33, 33, 34, 33],
-  CAM: [36, 24, 33, 29, 29, 28, 26, 32, 27, 40, 31],
-  INT: [33, 26, 26, 24, 26, 29, 36, 35, 26, 33, 31],
-  COR: [27, 26, 33, 34, 24, 30, 21, 26, 35, 32, 25],
-  BAH: [30, 33, 33, 29, 27, 27, 28, 37, 31, 26, 35],
-  GRE: [36, 30, 35, 27, 29, 30, 29, 37, 30, 23, 35],
-  RBB: [29, 27, 31, 27, 29, 34, 27, 25, 23, 34, 27],
-  VAS: [31, 30, 24, 23, 26, 28, 34, 34, 27, 20, 38],
-  SAN: [26, 29, 29, 32, 27, 33, 33, 26, 26, 31, 34],
-  MIR: [39, 33, 28, 31, 37, 29, 31, 29, 27, 27, 30],
-  CAP: [36, null, null, null, null, 28, 24, 25, null, 34, 25],
-  VIT: [28, 35, 33, 26, 33, 25, 28, 28, 39, 29, 30],
-  CFC: [22, null, null, null, null, 33, 36, 31, 21, null, 32],
-  CHA: [null, null, 30, null, null, null, 34, null, 32, null, null],
-  REM: [38, null, 34, null, null, 33, null, null, 26, 34, 32]
+  "Flamengo": [31, 33, 30, 30, 35, 35, null, 29, 32, 27, 29],
+  "Palmeiras": [null, 22, 33, 29, 28, null, 30, null, 33, 21, 26],
+  "Botafogo": [null, 27, null, null, 34, 30, null, null, 23, null, 28],
+  "Cruzeiro": [39, 31, 28, null, null, 32, 33, null, 30, 27, 24],
+  "Fluminense": [46, 36, 42, 26, 34, 25, 25, 28, 37, 28, 38],
+  "São Paulo": [37, null, 35, null, 33, 24, 26, null, 33, 34, 33],
+  "Atlético-MG": [36, 24, null, 29, null, 28, null, 32, 27, null, null],
+  "Internacional": [33, 26, null, 24, 26, 29, 36, 35, 26, 33, null],
+  "Corinthians": [27, 26, 33, 34, 24, 30, 21, 26, 35, 32, 25],
+  "Bahia": [null, null, null, 29, 27, 27, 28, 37, null, 26, 35],
+  "Grêmio": [36, 30, 35, 27, 29, 30, 29, null, null, 23, 35],
+  "Bragantino": [29, 27, null, 27, 29, 34, 27, 25, 23, 34, 27],
+  "Vasco": [31, 30, 24, 23, 26, null, 34, null, 27, null, null],
+  "Santos": [26, 29, null, 32, 27, null, 33, 26, 26, null, 34],
+  "Mirassol": [39, null, 28, null, 37, 29, null, 29, 27, 27, 30],
+  "Athletico-PR": [36, null, null, null, null, 28, 24, 25, null, 34, 25],
+  "Vitória": [28, null, null, null, 33, null, 28, 28, 39, 29, 30],
+  "Coritiba": [22, null, null, null, null, null, 36, null, 21, null, 32],
+  "Remo": [38, null, 34, null, null, null, null, null, null, 34, null],
 };
 /* jogadores estrangeiros (não são convocados para a Seleção Brasileira) */
 const ABROAD = new Set(['Arrascaeta','Varela','De la Cruz','Pulgar','Gustavo Gómez','Piquerez','Aníbal Moreno','Flaco López','Giay','Savarino','Barboza','Bastos','Villalba','Lucas Romero','Freytes','Canobbio','Germán Cano','Arboleda','Alan Franco','Calleri','Junior Alonso','Fausto Vera','Rochet','Aguirre','Bernabei','Carbonero','Borré','Garro','Carrillo','Memphis','Villasanti','Kannemann','Amuzu','Braithwaite','Cristaldo','Andrés Hurtado','Guzmán Rodríguez','Pitta','Nuno Moreira','Vegetti','Rollheiser','Barreal','Escobar','Cédric','Portilla','Zapelli','Mendoza','Viveros','Raúl Cáceres','Cantillo','Banguera','Diego Hernández','Poveda','Walter Clar','Lucas Halter']);
 const EURO = ['Benfica','Porto','Sporting','Real Betis','Sevilla','Villarreal','Lyon','Monaco','Ajax','PSV','Brighton','West Ham','Atlético de Madrid','Milan','Roma','Zenit','Shakhtar','Lille'];
-const PNAMES = ['Bolinha','Gudinho','Pipoca','Tatu','Quique','Rolinha','Pingo','Zé Bola','Bilha','Miçanga','Tico','Tampinha','Botão','Grão','Esferinha','Bolota','Peteca','Pião','Caroço','Jabuti','Feijão','Coquinho','Bituca','Rolemã','Pitoco','Biloca','Tatuzinho','Bolacha','Paçoca','Cocada','Sabiá','Canarinho','Tucano','Caju','Pitanga','Jiló','Quiabo','Bananinha','Fubá','Trovão'];
+const OLD_PNAMES = new Set(['Bolinha','Gudinho','Pipoca','Tatu','Quique','Rolinha','Pingo','Zé Bola','Bilha','Miçanga','Tico','Tampinha','Botão','Grão','Esferinha','Bolota','Peteca','Pião','Caroço','Jabuti','Feijão','Coquinho','Bituca','Rolemã','Pitoco','Biloca','Tatuzinho','Bolacha','Paçoca','Cocada','Sabiá','Canarinho','Tucano','Caju','Pitanga','Jiló','Quiabo','Bananinha','Fubá','Trovão']);
+const NM = {
+  br: { f: ['Lucas','Gabriel','Matheus','Pedro','João','Rafael','Felipe','Vitor','Bruno','Diego','Thiago','Gustavo','Caio','Renan','Igor','Leandro','Rodrigo','Daniel','André','Marcos','Henrique','Luan','Wesley','Kaique','Ryan','Davi','Murilo','Enzo','Yago','Alan','Jean','Fabrício','Douglas','Everton','Wellington','Anderson','Jonathan','Maicon','Willian','Paulo','Leonardo','Guilherme','Júlio','Ramon','Otávio','Hugo','Samuel','Iago','Nathan','Erick','Kauan','Breno','Danilo','Alisson','Robson','Fernando','Ricardo','Sérgio','Cristiano','Emerson'],
+        s: ['Silva','Santos','Oliveira','Souza','Lima','Pereira','Costa','Rodrigues','Almeida','Nascimento','Carvalho','Araújo','Ribeiro','Gomes','Martins','Rocha','Barbosa','Moura','Cardoso','Teixeira','Freitas','Mendes','Ramos','Batista','Dias','Moreira','Nunes','Vieira','Campos','Pinto','Farias','Brito','Machado','Cunha','Fonseca','Lopes','Assis','Tavares','Prado','Bezerra'],
+        nick: ['Juninho','Netinho','Zezinho','Tiaguinho','Dudu','Nenê','Fabinho','Robinho','Vitinho','Lelê','Pedrinho','Rafinha','Léo','Gui','Didi','Toninho','Biro','Careca','Índio','Marquinhos','Serginho','Luizinho','Cacá','Dedé','Pablo','Patrick','Jajá','Kiko','Tinga','Mosquito'] },
+  es: { f: ['Juan','Matías','Santiago','Nicolás','Facundo','Agustín','Diego','Martín','Lucas','Franco','Gonzalo','Federico','Emiliano','Joaquín','Tomás','Sebastián','Cristian','Ignacio','Rodrigo','Andrés','Felipe','Pablo','Ezequiel','Brian','Kevin','Alexis','Luis','Carlos','Jorge','Mauricio'],
+        s: ['González','Rodríguez','Fernández','López','Martínez','Gómez','Pérez','Sánchez','Romero','Díaz','Álvarez','Torres','Ruiz','Ramírez','Flores','Benítez','Acosta','Medina','Herrera','Suárez','Aguirre','Giménez','Molina','Castro','Ortiz','Silva','Rojas','Vargas','Cabrera','Sosa'] },
+  intl: { f: ['Luka','Marco','Daniel','Jan','Ali','Omar','Youssef','Mohamed','Kai','Lukas','Thomas','Hugo','Rúben','Ivan','Mateo','Leon','Ahmed','Khalid','Sami','Noah'],
+          s: ['Müller','Rossi','Novak','Haddad','Mansour','Ibrahim','Fernandes','Dubois','Kovač','Schmidt','Andersen','Al-Dossari','Hassan','Mendy','Petrović','Martin','Costa','Nilsson','Bakr','Laurent'] },
+};
+function genName(kind) {
+  const n = NM[kind] || NM.br;
+  if (kind === 'br' || !kind) { const r = Math.random(); return r < .22 ? pick(n.nick) : r < .5 ? pick(n.f) + ' ' + pick(n.s) : pick(n.f) + (Math.random() < .5 ? '' : ' ' + pick(n.s)); }
+  return pick(n.f) + ' ' + pick(n.s);
+}
+const nameKind = name => /Real Madrid|Manchester|^Al /.test(name) ? 'intl' : 'es';
 const YNAMES = ['Kauã','Davi','Enzo','Pietro','Ryan','Luan','Kayky','Wesley','Caio','Juninho','Pedrinho','Arthurzinho','Miguel','Heitor','Bernardo','Samuel','Lorenzo','Benício','Nicolas','Joaquim','Vitinho','Gui','Dudu','Rafinha'];
 const YSUR = ['Silva','Santos','Souza','Oliveira','Lima','Costa','Pereira','Rocha','Alves','Ribeiro','Carvalho','Gomes','Martins','Araújo','Barbosa','Moura'];
 const STAFF_N = ['Marcos Ribeiro','Paulo Henrique Lopes','Carla Mendes','Rogério Vasconcelos','Fábio Dantas','Renata Prado','Anderson Teles','Luciana Paiva','Cláudio Nogueira','Sérgio Amaral','Juliana Bastos','Tiago Fontes','Ricardo Leme','Patrícia Moura','Gustavo Arantes','Beatriz Salles'];
@@ -1072,7 +1125,7 @@ function makePlayer(base, o = {}) {
   const pos = o.pos || 'MEI', w = POSW[pos];
   const age = o.age != null ? o.age : rint(19, 33);
   const r = Math.random(), tr = r < .07 ? 'lider' : r < .15 ? 'temperamental' : r < .22 ? 'classico' : '';
-  const p = { id: PID++, name: o.name || pick(PNAMES), num: o.num || 0, pos, foot: Math.random() < .27 ? 'E' : 'D', age, inj: 0, susp: 0, conv: 0, yc: 0, g: {}, ct: rint(1, 4), tr, ten: 0, bench: 0, celeb: pick(CELEBS), hist: { apps: 0, gols: 0, tit: [], clubs: [] } };
+  const p = { id: PID++, name: o.name || genName(o.kind), num: o.num || 0, pos, foot: Math.random() < .27 ? 'E' : 'D', age, inj: 0, susp: 0, conv: 0, yc: 0, g: {}, ct: rint(1, 4), tr, ten: 0, bench: 0, celeb: pick(CELEBS), hist: { apps: 0, gols: 0, tit: [], clubs: [] } };
   for (const [k] of ATTRS) {
     let v = base + rnd(-6, 6) + (w[k] ? 5 : -9);
     if (k === 'ref') v = pos === 'GOL' ? base + rnd(-4, 8) : base - 35;
@@ -1082,10 +1135,25 @@ function makePlayer(base, o = {}) {
   p.pot = o.pot || clamp(pOvr(p) + (age <= 23 ? rint(4, 18) : 0), 30, 99);
   return p;
 }
-function makeSquad(base, names, formation, realPos) {
+function makeSquad(base, names, formation, realPos, kind) {
   const used = new Set((names || []).filter(Boolean));
-  const nm = i => { let n = names && names[i]; if (!n) { n = pick(PNAMES); for (let g = 0; used.has(n) && g < 60; g++) n = pick(PNAMES); } used.add(n); return n; };
+  const nm = i => { let n = names && names[i]; if (!n) { n = genName(kind); for (let g = 0; used.has(n) && g < 60; g++) n = genName(kind); } used.add(n); return n; };
   return Array.from({ length: 16 }, (_x, i) => makePlayer(i < 11 ? base : base - 4, { name: nm(i), num: i + 1, pos: realPos && i < 11 ? REAL_POS[i] : slotPos(formation, i) }));
+}
+/* saves antigos: troca apelidos genéricos por jogadores reais do elenco atual (ou por nomes realistas) */
+function realNames() {
+  const all = Object.values(S.teams), taken = new Set(all.flatMap(t => t.players.map(p => p.name)));
+  const CAT = { GOL: 'GOL', ZAG: 'ZAG', LAT: 'LAT', VOL: 'VOL', MEI: 'MEI', PON: 'ATA', CA: 'ATA' }, SL = ['GOL','LAT','ZAG','ZAG','LAT','VOL','VOL','MEI','MEI','ATA','ATA','GOL','ZAG','LAT','MEI','ATA'];
+  for (const t of all) {
+    const fake = t.players.filter(p => OLD_PNAMES.has(p.name)), sq = SQUADS[t.name];
+    if (sq) {
+      const free = sq.map((n, i) => ({ n, c: SL[i] })).filter(x => x.n && !taken.has(x.n));
+      for (const p of fake) { const k = free.findIndex(x => x.c === CAT[p.pos]), x = free.splice(k >= 0 ? k : 0, 1)[0]; if (x) { p.name = x.n; taken.add(x.n); } }
+    }
+    const kind = t.state === null ? nameKind(t.name) : 'br';
+    for (const p of t.players) if (OLD_PNAMES.has(p.name)) { let n = genName(kind); for (let g = 0; taken.has(n) && g < 40; g++) n = genName(kind); p.name = n; taken.add(n); }
+  }
+  for (const p of (S.free || [])) if (OLD_PNAMES.has(p.name)) p.name = genName('br');
 }
 function makeProspect(base, olh) {
   const p = makePlayer(base - 14, { name: `${pick(YNAMES)} ${pick(YSUR)}`, age: rint(16, 17), pos: pick(['GOL', 'ZAG', 'LAT', 'VOL', 'MEI', 'PON', 'CA', 'CA', 'PON', 'MEI']) });
@@ -1096,10 +1164,10 @@ function makeTeam(club, div, id, base) {
   const [name, ab, c1, c2, pt, x5, x6, x7] = club;
   const foreign = typeof x5 === 'string' && x5.length > 2;
   const st = STADIUMS[ab] || [foreign ? x5 : 'Estádio Municipal', foreign ? x6 : 8000];
-  const real = !!SQUADS[ab], formation = real ? '4-2-3-1' : pick(Object.keys(FORM));
+  const real = !!SQUADS[name], formation = real ? '4-2-3-1' : pick(Object.keys(FORM));
   const lvl = div === 'A' ? 4 : div === 'B' ? 3 : div === 'D' ? 1 : 2;
-  const squad = makeSquad(x7 || base, SQUADS[ab], formation, real);
-  if (AGES[ab]) squad.forEach((p, i) => { const a = AGES[ab][i]; if (i < 11 && a) { p.age = a; if (a > 23) p.pot = pOvr(p); } });
+  const squad = makeSquad(x7 || base, SQUADS[name], formation, real, foreign ? nameKind(name) : 'br');
+  if (AGES[name]) squad.forEach((p, i) => { const a = AGES[name][i]; if (i < 11 && a) { p.age = a; if (a > 23) p.pot = pOvr(p); } });
   return { id, name, abbr: ab, c1, c2, pt: pt || '', state: foreign ? null : x5, formation, players: squad,
     stadium: { name: st[0], cap: st[1], comfort: 0 }, morale: 60, chem: 75, staff: { fis: lvl, med: lvl, aux: lvl, olh: lvl }, sponsor: pick(SPONSORS), lastXI: [] };
 }
@@ -1868,7 +1936,7 @@ function takeOver(id) {
 /* =====================================================================
    SALVAR
    ===================================================================== */
-try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); if (!S.agesFixed) { for (const t of Object.values(S.teams)) { const ag = AGES[t.abbr], sq = SQUADS[t.abbr]; if (!ag || !sq) continue; for (const p of t.players) { const k = sq.indexOf(p.name); if (k >= 0 && ag[k]) { p.age = ag[k] + (S.season - 1); if (p.age > 23) p.pot = Math.min(p.pot, Math.max(pOvr(p), p.pot)); } } } S.agesFixed = true; } } } catch (e) { S = null; }
+try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); if (!S.agesFixed) { for (const t of Object.values(S.teams)) { const ag = AGES[t.name], sq = SQUADS[t.name]; if (!ag || !sq) continue; for (const p of t.players) { const k = sq.indexOf(p.name); if (k >= 0 && ag[k]) { p.age = ag[k] + (S.season - 1); if (p.age > 23) p.pot = Math.min(p.pot, Math.max(pOvr(p), p.pot)); } } } S.agesFixed = true; } if (!S.namesV2) { realNames(); S.namesV2 = true; } } } catch (e) { S = null; }
 const save = () => { if (!S) return; S.pid = PID; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 /* =====================================================================
