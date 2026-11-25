@@ -164,6 +164,16 @@ td.pts { font-weight: 700; color: var(--chalk); }
 .reward { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--amber); justify-content: center; }
 .confirm { display: flex; gap: 8px; flex-wrap: wrap; }
 nav.tabs { grid-template-columns: repeat(6, 1fr); }
+.cop-g { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.cop-g.mine, .cop-row.mine { box-shadow: inset 3px 0 0 var(--amber); padding-left: 6px; }
+.cop-t { display: flex; align-items: center; gap: 6px; justify-content: flex-end; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cop-t.r { justify-content: flex-start; }
+.cop-s { font-family: var(--f-display); font-size: 15px; font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+.cop-x { grid-column: 1 / -1; font-size: 11px; color: var(--muted); text-align: center; }
+.cop-row { display: grid; grid-template-columns: 1fr 28px 24px 30px 28px; gap: 6px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.cop-row > span:not(.cop-t), .cop-row > b { text-align: center; }
+.cop-row .cop-t { justify-content: flex-start; }
+.cop-hd { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-top: 0; }
 .tr-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .tr-row.mine { box-shadow: inset 3px 0 0 var(--amber); padding-left: 8px; }
 .tr-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1252,6 +1262,7 @@ function newCareer(ch) {
   S.youth = [0, 1, 2].map(() => makeProspect(DIVBASE[userDiv()], 2));
   S.pid = PID;
   startSeason();
+  startCopinha();
 }
 function defaults() {
   return { divisions: Object.assign({ D: [] }, S.divisions), fans: 60, rank: {}, champions: [], prev: null, pre: null, loan: null, ban: 0, saf: null, safOffer: null,
@@ -1333,6 +1344,7 @@ function setupEstadual() {
 function startSeason() {
   PID = Math.max(PID, S.pid || 1);
   ensureD();
+  S.ybids = [];
   for (const d of LG) { S.fixtures[d] = roundRobin(S.divisions[d], d === 'C' || d === 'D' ? 'single' : false); S.results[d] = []; for (let r = S.fixtures[d].length; r < 38; r++) S.fixtures[d][r] = []; }
   S.cGroups = null;
   for (const t of Object.values(S.teams)) for (const p of t.players) { p.g = {}; p.inj = 0; p.susp = 0; p.conv = 0; p.yc = 0; }
@@ -1616,6 +1628,8 @@ function playAI(h, a, comp, neutral) { const m = runMatch(T(h), T(a), comp, neut
 /* processa um item do calendário. ures = resultado do usuário { hg, ag, ph, pa } */
 function processItem(it, ures) {
   tickInjuries();
+  copTick();
+  if (it.k === 'liga') { youthBidsTick(false); scoutTick(); }
   const info = { prize: 0, gate: 0 };
   if (it.k === 'fifa') { fifaCall(); return info; }
   if (it.k === 'liga') {
@@ -1932,6 +1946,212 @@ function aiFinanceTick() {
     if (f.cash < 0 && windowOpen() && Math.random() < .3) forcedSale(t);
   }
 }
+/* =====================================================================
+   OLHEIROS: garimpo de meninos de 14 a 16 anos pelos estados
+   ===================================================================== */
+const SKILLS = {
+  drible: ['Drible desconcertante', { dri: 8 }], chute: ['Chute de longe', { chu: 8 }], cabeca: ['Cabeceio', { cab: 8 }], veloz: ['Velocista', { vel: 8 }],
+  visao: ['Visão de jogo', { pas: 8 }], desarme: ['Desarme', { def: 8 }], paredao: ['Paredão', { ref: 8 }], falta: ['Cobrança de falta', { chu: 4, pas: 4 }],
+  canhota: ['Canhota mágica', { pas: 4, dri: 4 }], raca: ['Raça', { vel: 2, def: 2, chu: 2, pas: 2 }]
+};
+const SCOUT_UF = {
+  RS: ['Rio Grande do Sul', 'Zagueiros, volantes e goleiros de pegada', { ZAG: 3, VOL: 3, GOL: 2, LAT: 1, MEI: 1, PON: 1, CA: 1 }, ['desarme', 'cabeca', 'raca', 'paredao'], 260],
+  SC: ['Santa Catarina', 'Laterais e meias bem formados', { LAT: 3, MEI: 2, VOL: 2, ZAG: 1, PON: 1, CA: 1, GOL: 1 }, ['visao', 'raca', 'falta'], 240],
+  PR: ['Paraná', 'Jogadores táticos e equilibrados', { MEI: 2, VOL: 2, LAT: 2, ZAG: 2, CA: 1, PON: 1, GOL: 1 }, ['visao', 'desarme'], 220],
+  SP: ['São Paulo', 'Meias técnicos e muita concorrência', { MEI: 3, PON: 2, CA: 2, VOL: 1, LAT: 1, ZAG: 1, GOL: 1 }, ['visao', 'falta', 'drible', 'chute'], 200],
+  RJ: ['Rio de Janeiro', 'Atacantes e pontas habilidosos', { CA: 3, PON: 3, MEI: 2, LAT: 1, VOL: 1, ZAG: 1, GOL: 1 }, ['drible', 'chute', 'canhota'], 200],
+  MG: ['Minas Gerais', 'Meias e volantes inteligentes', { MEI: 3, VOL: 3, ZAG: 1, LAT: 1, PON: 1, CA: 1, GOL: 1 }, ['visao', 'falta', 'desarme'], 220],
+  BA: ['Bahia', 'Pontas dribladores e velozes', { PON: 4, CA: 2, MEI: 2, LAT: 1, VOL: 1, ZAG: 1, GOL: 1 }, ['drible', 'veloz', 'canhota'], 280],
+  PE: ['Pernambuco', 'Centroavantes e artilheiros', { CA: 4, PON: 2, MEI: 1, VOL: 1, ZAG: 1, LAT: 1, GOL: 1 }, ['chute', 'cabeca', 'raca'], 300],
+  CE: ['Ceará', 'Laterais rápidos e incansáveis', { LAT: 4, PON: 2, VOL: 1, MEI: 1, CA: 1, ZAG: 1, GOL: 1 }, ['veloz', 'raca'], 300],
+  GO: ['Goiás e Distrito Federal', 'Garimpo equilibrado', { MEI: 2, CA: 2, PON: 2, ZAG: 2, LAT: 1, VOL: 1, GOL: 1 }, ['raca', 'chute', 'veloz'], 250],
+  PA: ['Pará e Amazonas', 'Diamantes brutos: menos prontos, mais potencial', { PON: 2, CA: 2, MEI: 2, LAT: 2, ZAG: 1, VOL: 1, GOL: 1 }, ['veloz', 'drible', 'raca'], 340]
+};
+const GIANTS = ['Real Madrid', 'Barcelona', 'Manchester City', 'Chelsea', 'Bayern de Munique', 'Paris Saint-Germain', 'Juventus', 'Arsenal', 'Liverpool', 'Benfica'];
+const skName = p => p.sk && SKILLS[p.sk] ? SKILLS[p.sk][0] : '';
+const skTag = p => p.sk && SKILLS[p.sk] ? ` <span class="tag" style="background:var(--good);color:#062414">${SKILLS[p.sk][0]}</span>` : '';
+const scoutCost = uf => Math.round(SCOUT_UF[uf][4] * (1 + (T('user').staff.olh || 1) * .15) / 10) * 10;
+const maxMissions = () => (T('user').staff.olh || 1) >= 4 ? 2 : 1;
+function makeKid(uf) {
+  const [, , posW, sks] = SCOUT_UF[uf], olh = T('user').staff.olh || 1, raw = uf === 'PA';
+  const pos = wpick(Object.keys(posW), Object.values(posW));
+  const p = makePlayer((DIVBASE[userDiv()] || 50) - 22 + rnd(-3, 4) - (raw ? 3 : 0), { name: `${pick(YNAMES)} ${pick(YSUR)}`, age: rint(14, 16), pos });
+  if (pos === 'GOL') p.ref = clamp(p.ref + 6, 15, 99);
+  const luck = Math.random() < .07 ? 10 : 0;
+  p.pot = clamp(rint(56, 84) + olh * 2.5 + (raw ? 4 : 0) + luck, 50, 99); p.ct = 3;
+  if (Math.random() < .45 + olh * .03) { let k = pick(sks); if (k === 'paredao' && pos !== 'GOL') k = 'raca'; if (pos === 'GOL' && Math.random() < .7) k = 'paredao'; p.sk = k; for (const [a, v] of Object.entries(SKILLS[k][1])) p[a] = clamp(p[a] + v, 15, 99); if (k === 'canhota') p.foot = 'E'; }
+  p.from = SCOUT_UF[uf][0];
+  return p;
+}
+function sendScout(uf) {
+  S.missions = S.missions || [];
+  const cost = scoutCost(uf);
+  if (S.missions.length >= maxMissions() || S.money < cost) return false;
+  addMoney(-cost, 'Comissão técnica'); S.missions.push({ uf, left: 3 });
+  news(`O olheiro do ${T('user').name} viaja para ${SCOUT_UF[uf][0]} em busca de jovens talentos.`, 'Base', 'user');
+  return true;
+}
+function scoutTick() {
+  S.missions = S.missions || []; S.scoutFound = S.scoutFound || []; S.kids = S.kids || [];
+  for (const m of S.missions) if (--m.left <= 0) {
+    const n = rint(2, 4), kids = Array.from({ length: n }, () => makeKid(m.uf)); kids.forEach(k => { k.exp = 8; });
+    S.scoutFound.push(...kids);
+    const best = kids.slice().sort((a, b) => b.pot - a.pot)[0];
+    news(`Olheiro volta de ${SCOUT_UF[m.uf][0]} com ${n} indicações.`, 'Base', 'user', `O relatório destaca ${best.name}, ${best.age} anos, ${POSL[best.pos]}${best.sk ? `, com ${SKILLS[best.sk][0].toLowerCase()}` : ''}. Veja os nomes em Elenco › Olheiros e decida quem contratar.`);
+  }
+  S.missions = S.missions.filter(m => m.left > 0);
+  S.scoutFound = S.scoutFound.filter(k => --k.exp > 0);
+  // gigantes da Europa de olho nos meninos mais promissores
+  if (Math.random() < .08) {
+    const c = S.kids.concat(S.youth).filter(p => (p.pot >= 86 || (p.sk && p.pot >= 82)) && !(S.ybids || []).some(b => b.pid === p.id));
+    if (c.length) { const p = pick(c), club = pick(GIANTS), amount = Math.round(Math.max(youthAsk(p, 'user') * rnd(2, 3.2), 1500) / 10) * 10;
+      (S.ybids = S.ybids || []).push({ pid: p.id, club, amount, giant: true });
+      news(`${club} faz proposta de ${brl(amount)} por ${p.name}, joia de ${p.age} anos do ${T('user').name}!`, 'Proposta', 'user', `${p.name} chamou a atenção dos observadores do ${club}${p.sk ? ` pela ${SKILLS[p.sk][0].toLowerCase()}` : ''}. O clube europeu quer levá-lo já para a sua academia.`); }
+  }
+}
+/* jovem da base do usuário: pode estar no sub-20 (S.youth) ou no sub-17 (S.kids) */
+function baseFind(pid) { for (const L of [S.youth, S.kids || []]) { const i = L.findIndex(q => q.id === pid); if (i >= 0) return [L, i]; } return [null, -1]; }
+/* =====================================================================
+   COPINHA: Copa São Paulo de Futebol Júnior, simulada no começo de cada temporada
+   ===================================================================== */
+const COP_PH = ['Fase de grupos · 1ª rodada', 'Fase de grupos · 2ª rodada', 'Fase de grupos · 3ª rodada', 'Oitavas de final', 'Quartas de final', 'Semifinal', 'Final'];
+const COP_W = { GOL: 0, ZAG: .5, LAT: .6, VOL: 1, MEI: 2.4, PON: 3, CA: 4.2 };
+const youthBase = id => (DIVBASE[teamDiv(id)] || DIVBASE.C) + 2;
+function copSquad(id) {
+  if (id === 'user') return S.youth;
+  return (S.cop && S.cop.squads[id]) || [];
+}
+function copXI(id) {
+  const sq = copSquad(id).slice().sort((a, b) => pOvr(b) - pOvr(a));
+  const gk = sq.find(p => p.pos === 'GOL'), rest = sq.filter(p => p !== gk);
+  return (gk ? [gk] : []).concat(rest).slice(0, 11);
+}
+const copStr = id => { const xi = copXI(id); return xi.length ? xi.reduce((a, p) => a + pOvr(p), 0) / xi.length - (11 - xi.length) * 2 : 30; };
+function poisson(l) { let k = 0, p = 1; const L = Math.exp(-l); do { k++; p *= Math.random(); } while (p > L); return k - 1; }
+function fillUserBase() {
+  const u = T('user'), lvl = (u.staff.olh || 2) + (S.baseLvl || 0) - 2;
+  while (S.youth.length < 12) { const np = makeProspect(DIVBASE[userDiv()], lvl); np.age = rint(17, 19); S.youth.push(np); }
+  if (!S.youth.some(p => p.pos === 'GOL')) { const np = makeProspect(DIVBASE[userDiv()], lvl); np.pos = 'GOL'; np.ref = clamp(np.ref + 40, 15, 99); np.age = 18; S.youth.push(np); }
+}
+function startCopinha() {
+  const others = LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user');
+  const A = (S.divisions.A || []).filter(id => id !== 'user'), rest = shuffle(others.filter(id => !A.includes(id)));
+  const teams = shuffle(['user'].concat(A, rest).slice(0, 32));
+  const squads = {};
+  for (const id of teams) if (id !== 'user') {
+    const lvl = { A: 3, B: 2, C: 1, D: 0 }[teamDiv(id)] ?? 1;
+    squads[id] = ['GOL', 'ZAG', 'ZAG', 'LAT', 'LAT', 'VOL', 'MEI', 'MEI', 'PON', 'CA', 'CA', pick(['MEI', 'PON', 'ZAG', 'VOL'])].map(pos => { const np = makeProspect(youthBase(id) + rnd(-2, 3), lvl); np.pos = pos; if (pos === 'GOL') np.ref = clamp(np.ref + 40, 15, 99); np.age = rint(17, 19); return np; });
+  }
+  fillUserBase();
+  const groups = []; for (let g = 0; g < 8; g++) groups.push(teams.slice(g * 4, g * 4 + 4));
+  S.cop = { s: S.season, phase: 0, teams, groups, squads, games: [], st: {}, ko: [], champ: null, vice: null, awards: null };
+  const ug = groups.findIndex(g => g.includes('user'));
+  news(`Começa a Copa São Paulo de Futebol Júnior ${2025 + S.season}: 32 clubes em busca do título da Copinha.`, 'Base', 'user', `O ${T('user').name} está no grupo ${'ABCDEFGH'[ug]}, com ${groups[ug].filter(id => id !== 'user').map(id => T(id).name).join(', ')}. É a vitrine das categorias de base: olheiros de todo o país acompanham os jogos, e os destaques valorizam.`);
+}
+function copStat(p) { const st = S.cop.st; return st[p.id] || (st[p.id] = { g: 0, j: 0, r: 0 }); }
+function copPlay(h, a, ko) {
+  const sh = copStr(h), sa = copStr(a), d = (sh - sa) / 16;
+  let hg = poisson(1.35 * Math.exp(d)), ag = poisson(1.35 * Math.exp(-d)), pen = null;
+  if (ko && hg === ag) { let ph = 0, pa = 0; for (let i = 0; i < 5; i++) { ph += Math.random() < .75; pa += Math.random() < .75; } while (ph === pa) { ph += Math.random() < .75; pa += Math.random() < .75; } pen = [ph, pa]; }
+  const sc = { h: [], a: [] };
+  for (const [side, id, n, gf, ga] of [['h', h, hg, hg, ag], ['a', a, ag, ag, hg]]) {
+    const xi = copXI(id), bench = copSquad(id).filter(p => !xi.includes(p)), avg = xi.reduce((x, p) => x + pOvr(p), 0) / Math.max(1, xi.length);
+    const played = xi.concat(bench.length ? [pick(bench)] : []);
+    const goals = {}; for (let k = 0; k < n; k++) { const sco = wpick(xi, xi.map(p => (COP_W[p.pos] ?? 1) * Math.pow(Math.max(20, pOvr(p)) / 50, 3))); if (sco) { goals[sco.id] = (goals[sco.id] || 0) + 1; sc[side].push(sco.name); } }
+    for (const p of played) { const st = copStat(p), gl = goals[p.id] || 0;
+      st.j++; st.g += gl; st.r += clamp(6.2 + (pOvr(p) - avg) / 9 + (gf > ga ? .5 : gf < ga ? -.4 : 0) + gl * .9 + (p.pos === 'GOL' || p.pos === 'ZAG' ? (ga === 0 ? .6 : -ga * .15) : 0) + gauss() * .45, 3, 10); }
+  }
+  const gm = { ph: S.cop.phase, h, a, hg, ag, pen, sc };
+  S.cop.games.push(gm);
+  return gm;
+}
+function copWinner(g) { return g.hg > g.ag ? g.h : g.hg < g.ag ? g.a : g.pen ? (g.pen[0] > g.pen[1] ? g.h : g.a) : null; }
+function copTable(grp) {
+  const r = Object.fromEntries(grp.map(id => [id, { id, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, pts: 0 }]));
+  for (const g of S.cop.games) if (g.ph < 3 && r[g.h] && r[g.a]) { const H = r[g.h], A2 = r[g.a]; H.j++; A2.j++; H.gp += g.hg; H.gc += g.ag; A2.gp += g.ag; A2.gc += g.hg;
+    if (g.hg > g.ag) { H.v++; A2.d++; H.pts += 3; } else if (g.hg < g.ag) { A2.v++; H.d++; A2.pts += 3; } else { H.e++; A2.e++; H.pts++; A2.pts++; } }
+  return Object.values(r).sort((x, y) => y.pts - x.pts || (y.gp - y.gc) - (x.gp - x.gc) || y.gp - x.gp || copStr(y.id) - copStr(x.id));
+}
+const copAvg = st => st && st.j ? st.r / st.j : 0;
+function copPlayers() {
+  const out = []; if (!S.cop) return out;
+  for (const id of S.cop.teams) for (const p of copSquad(id)) { const st = S.cop.st[p.id]; if (st && st.j) out.push({ id, p, st }); }
+  return out;
+}
+function copTick() {
+  const c = S.cop; if (!c || c.champ || c.s !== S.season) return;
+  const ph = c.phase, uname = T('user').name;
+  let ug = null;
+  if (ph < 3) {
+    const pairs = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]][ph];
+    for (const grp of c.groups) for (const [i, j] of pairs) { const g = copPlay(grp[i], grp[j], false); if (g.h === 'user' || g.a === 'user') ug = g; }
+    if (ph === 2) {
+      const T8 = c.groups.map(copTable);
+      c.ko = [[0, 1], [1, 0], [2, 3], [3, 2], [4, 5], [5, 4], [6, 7], [7, 6]].map(([x, y]) => [T8[x][0].id, T8[y][1].id]);
+      const out = T8.some(t => t.slice(2).some(r => r.id === 'user'));
+      if (out) news(`A base do ${uname} se despede da Copinha ainda na fase de grupos.`, 'Base', 'user');
+      else news(`A base do ${uname} se classifica para as oitavas da Copinha!`, 'Base', 'user');
+    }
+  } else {
+    const next = [];
+    for (const [h, a] of c.ko) { const g = copPlay(h, a, true), w = copWinner(g); next.push(w); if (g.h === 'user' || g.a === 'user') ug = g; }
+    if (ph === 6) { c.champ = next[0]; c.vice = c.ko[0].find(id => id !== next[0]); copFinish(); }
+    else { c.ko = []; for (let i = 0; i < next.length; i += 2) c.ko.push([next[i], next[i + 1]]); }
+  }
+  if (ug) { const us = ug.h === 'user', gf = us ? ug.hg : ug.ag, ga = us ? ug.ag : ug.hg, opp = T(us ? ug.a : ug.h).name;
+    news(`Copinha (${COP_PH[ph].toLowerCase()}): ${uname} ${gf} x ${ga} ${opp}${ug.pen ? ` (${us ? ug.pen[0] : ug.pen[1]} x ${us ? ug.pen[1] : ug.pen[0]} nos pênaltis)` : ''}.`, 'Base', 'user',
+      `${(us ? ug.sc.h : ug.sc.a).length ? `Gols do ${uname}: ${(us ? ug.sc.h : ug.sc.a).join(', ')}.` : `O ${uname} passou em branco.`}`); }
+  c.phase++;
+  if (ph === 2 || ph === 4) youthBidsTick(true);
+}
+function copFinish() {
+  const c = S.cop, all = copPlayers();
+  const art = all.slice().sort((a, b) => b.st.g - a.st.g || copAvg(b.st) - copAvg(a.st))[0];
+  const craque = all.filter(x => x.st.j >= 3).sort((a, b) => copAvg(b.st) - copAvg(a.st))[0];
+  const need = { GOL: 1, LAT: 2, ZAG: 2, VOL: 1, MEI: 2, PON: 1, CA: 2 }, sel = [];
+  for (const pos in need) sel.push(...all.filter(x => x.p.pos === pos && x.st.j >= 2).sort((a, b) => copAvg(b.st) - copAvg(a.st)).slice(0, need[pos]));
+  const top = all.filter(x => x.st.j >= 2).sort((a, b) => copAvg(b.st) - copAvg(a.st)).slice(0, 20);
+  top.forEach((x, i) => { x.p.hype = Math.max(x.p.hype || 1, +(1.8 - i * .035).toFixed(2)); x.p.pot = clamp(x.p.pot + 2, 30, 99); });
+  if (art) art.p.hype = Math.max(art.p.hype || 1, 1.6);
+  const nm = x => x ? { pid: x.p.id, name: x.p.name, id: x.id, g: x.st.g, r: +copAvg(x.st).toFixed(1), pos: x.p.pos } : null;
+  c.awards = { art: nm(art), craque: nm(craque), sel: sel.map(nm) };
+  news(`${T(c.champ).name} é campeão da Copa São Paulo de Futebol Júnior ${2025 + c.s}!`, 'Campeão', c.champ,
+    `Na final, o ${T(c.champ).name} superou o ${T(c.vice).name}. ${craque ? `O craque da competição foi ${craque.p.name} (${T(craque.id).name}), com nota média ${copAvg(craque.st).toFixed(1)}.` : ''} ${art ? `${art.p.name} (${T(art.id).name}) foi o artilheiro, com ${art.st.g} gols.` : ''} Os destaques da Copinha já atraem o interesse de clubes de todo o país.`);
+  if (c.champ === 'user') { S.titles.push(`Copinha ${2025 + c.s}`); S.fans = clamp(S.fans + 4, 0, 100); makeCover('CAMPEÃO DA COPINHA!', `A base do ${T('user').name} conquista a Copa São Paulo`, 'user'); }
+  // clubes grandes levam alguns destaques de clubes menores
+  const bigs = (S.divisions.A || []).filter(id => hasFin(id) && !FIN(T(id)).ban);
+  for (const x of top.slice(0, 12)) {
+    if (x.id === 'user' || teamDiv(x.id) === 'A' || Math.random() > .3 || !bigs.length) continue;
+    const b = pick(bigs), fee = youthAsk(x.p, x.id), sq = S.cop.squads[x.id];
+    if (FIN(T(b)).cash < fee + wageBill(T(b))) continue;
+    sq.splice(sq.indexOf(x.p), 1); (S.cop.squads[b] = S.cop.squads[b] || []).push(x.p);
+    FIN(T(b)).cash -= fee; if (hasFin(x.id)) FIN(T(x.id)).cash += fee;
+    logTransfer(x.p.name, T(x.id).name, T(b).name, fee, 'base', x.p);
+    news(`${T(b).name} contrata ${x.p.name}, destaque da Copinha pelo ${T(x.id).name}.`, 'Base', b, `O ${POSL[x.p.pos]} de ${x.p.age} anos chamou a atenção na Copa São Paulo e chega para a base do ${T(b).name} por ${brl(fee)}.`);
+  }
+  youthBidsTick(true);
+}
+/* preço de um jovem: potencial e destaque na Copinha pesam mais que a força atual */
+function youthAsk(p, id) {
+  const df = { A: 1.25, B: 1, C: .8, D: .65 }[teamDiv(id)] || 1;
+  return Math.max(50, Math.round(value(p) * .4 * (.35 + Math.max(0, p.pot - 55) / 28) * (p.hype || 1) * df * (S.ask[p.id] || 1) / 10) * 10);
+}
+/* propostas pelos jovens do usuário */
+function youthBidsTick(force) {
+  S.ybids = S.ybids || [];
+  if (S.ybids.length >= 3 || !S.youth.length) return;
+  const cands = S.youth.filter(p => !S.ybids.some(b => b.pid === p.id) && ((p.hype || 1) > 1.1 || p.pot >= 78 || p.ysale));
+  if (!cands.length) return;
+  if (!force && Math.random() > .12) return;
+  const p = wpick(cands, cands.map(q => (q.hype || 1) * 2 + (q.ysale ? 3 : 0) + (q.pot - 60) / 10));
+  const pool = LG.flatMap(d => S.divisions[d] || []).filter(id => hasFin(id) && !FIN(T(id)).ban && FIN(T(id)).cash > youthAsk(p, 'user') * 1.5);
+  const eu = (p.hype || 1) > 1.5 && Math.random() < .35;
+  if (!pool.length && !eu) return;
+  const amount = Math.round(youthAsk(p, 'user') * rnd(.8, 1.25) * (eu ? 1.5 : 1) / 10) * 10;
+  const b = eu ? { pid: p.id, club: pick(EURO), amount } : { pid: p.id, tid: pick(pool), amount };
+  S.ybids.push(b);
+  news(`${eu ? b.club : T(b.tid).name} faz proposta de ${brl(amount)} por ${p.name}, da base do ${T('user').name}.`, 'Proposta', 'user');
+}
 function refreshMarket() {
   const pool = LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user');
   S.market = Array.from({ length: 12 }, () => { const tid = pick(pool); return { tid, pid: T(tid).players[rint(1, 15)].id }; });
@@ -2019,7 +2239,10 @@ function endSeason() {
   for (const l of S.loansIn) { const t = T(l.tid), i = u.players.findIndex(p => p.id === l.pid); if (i < 0) continue; if (l.back != null) { const j = t.players.findIndex(p => p.id === l.back); if (j >= 0) [u.players[i], t.players[j]] = [t.players[j], u.players[i]]; } else { const p = u.players.splice(i, 1)[0], j = t.players.length - 1; t.players[j] = p; while (u.players.length < 16) u.players.push(Object.assign(makeProspect(DIVBASE[userDiv()], u.staff.olh), { num: nextNum(u) })); } }
   S.loansIn = [];
   S.youth.forEach(p => { grow(p, S.ct); p.age--; grow(p, S.ct); });
-  S.youth = S.youth.concat([0, 1, 2].map(() => makeProspect(DIVBASE[teamDiv('user')], u.staff.olh + S.baseLvl))).slice(-8);
+  S.kids = S.kids || []; S.kids.forEach(p => { grow(p, S.ct); });
+  { const up = S.kids.filter(p => p.age >= 17); S.kids = S.kids.filter(p => p.age < 17); if (up.length) news(`${up.length} garoto${up.length > 1 ? 's' : ''} do sub-17 sobe${up.length > 1 ? 'm' : ''} para o sub-20 e ${up.length > 1 ? 'vão' : 'vai'} disputar a Copinha: ${up.map(p => p.name).join(', ')}.`, 'Base', 'user'); S.youth.push(...up); }
+  S.youth = S.youth.filter(p => p.age <= 20).concat([0, 1, 2].map(() => makeProspect(DIVBASE[teamDiv('user')], u.staff.olh + S.baseLvl))).slice(-16);
+  S.youth.forEach(p => { if (p.hype) p.hype = Math.max(1, +(p.hype * .75).toFixed(2)); });
   S.champions.push({ s: S.season, ...Object.fromEntries(LG.filter(d => champs[d]).map(d => [d, T(champs[d]).name])), ...Object.fromEntries(['est', 'cdb', 'lib', 'sul', 'mun', 'ne', 'vd', 'sup', 'rec'].filter(c => S.cups[c] && S.cups[c].champion).map(c => [c, T(S.cups[c].champion).name])), estName: S.cups.est.name });
   if (S.sponsor) { S.sponsor.len--; if (S.sponsor.len <= 0) { news(`Acabou o contrato com ${S.sponsor.name}. Escolha um novo patrocinador.`, 'Patrocínio'); S.sponsor = null; } }
   S.euro = [];
@@ -2028,7 +2251,7 @@ function endSeason() {
   S.lastSummary = sum;
   S.season++;
   S.pid = PID;
-  if (!S.fired) startSeason();
+  if (!S.fired) { startSeason(); startCopinha(); }
   return sum;
 }
 function updateRanking(tables, champs) {
@@ -2046,6 +2269,7 @@ function grow(p, ct) {
     if (p.age <= 23) p[k] = Math.min(99, p[k] + Math.max(0, Math.round(rnd(0, 2.5) + (p.pot - pOvr(p)) / 10 + (ct || 0) * .3)));
     else if (p.age >= 31) p[k] = Math.max(15, p[k] - rint(0, 3));
   }
+  if (p.sk && SKILLS[p.sk] && p.age <= 23) for (const a of Object.keys(SKILLS[p.sk][1])) p[a] = Math.min(99, p[a] + 1);
 }
 /* demissão: assume outro clube trocando os papéis dos ids */
 function takeOver(id) {
@@ -2057,13 +2281,14 @@ function takeOver(id) {
   S.members = Math.round(T('user').stadium.cap * ECON.member[userDiv()]);
   S.youth = [0, 1, 2].map(() => makeProspect(DIVBASE[userDiv()], 2));
   news(`Você é o novo técnico do ${T('user').name}.`, 'Carreira');
-  if (S.ci < S.cal.length) { setBoard(); S.offers = genOffers(); refreshMarket(); advanceAuto(); } else startSeason();
+  if (S.ci < S.cal.length) { setBoard(); S.offers = genOffers(); refreshMarket(); advanceAuto(); } else { startSeason(); startCopinha(); }
 }
 
 /* =====================================================================
    SALVAR
    ===================================================================== */
-try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); if (!S.agesFixed) { for (const t of Object.values(S.teams)) { const ag = AGES[t.name], sq = SQUADS[t.name]; if (!ag || !sq) continue; for (const p of t.players) { const k = sq.indexOf(p.name); if (k >= 0 && ag[k]) { p.age = ag[k] + (S.season - 1); if (p.age > 23) p.pot = Math.min(p.pot, Math.max(pOvr(p), p.pot)); } } } S.agesFixed = true; } if (!S.namesV2) { realNames(); S.namesV2 = true; } } } catch (e) { S = null; }
+try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); if (!S.agesFixed) { for (const t of Object.values(S.teams)) { const ag = AGES[t.name], sq = SQUADS[t.name]; if (!ag || !sq) continue; for (const p of t.players) { const k = sq.indexOf(p.name); if (k >= 0 && ag[k]) { p.age = ag[k] + (S.season - 1); if (p.age > 23) p.pot = Math.min(p.pot, Math.max(pOvr(p), p.pot)); } } } S.agesFixed = true; } if (!S.namesV2) { realNames(); S.namesV2 = true; }
+  try { if (!S.cop || S.cop.s !== S.season) startCopinha(); } catch (e) { S.cop = null; } } } catch (e) { S = null; }
 const save = () => { if (!S) return; S.pid = PID; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const bkMsg = t => { const e = document.getElementById('bkMsg'); if (e) e.textContent = t; };
 async function exportSave() {
@@ -2544,11 +2769,11 @@ function readEdit() {
 /* ---------- elenco ---------- */
 const trainCost = v => Math.round((v + 10) * 3 * (1 - .06 * S.ct));
 function squadView() {
-  return seg('sub-squad', sub.squad, [['squad', 'Elenco'], ['youth', `Base (${S.youth.length})`]]) + { squad: rosterView, youth: youthView }[sub.squad]();
+  return seg('sub-squad', sub.squad, [['squad', 'Elenco'], ['youth', `Base (${S.youth.length})${(S.ybids || []).length ? ' •' : ''}`], ['copa', 'Copinha'], ['scout', `Olheiros${(S.scoutFound || []).length ? ` (${S.scoutFound.length})` : ''}`]]) + { squad: rosterView, youth: youthView, copa: copaView, scout: scoutView }[sub.squad]();
 }
 function pnum(t, p, i) { const gk = p.pos === 'GOL'; return `<span class="pnum" style="background:${gk ? t.c2 : t.c1};border-color:${gk ? t.c1 : t.c2};color:${gk ? t.c1 : t.c2}">${p.num}</span>`; }
 function statRows(p, i, train) {
-  return `<div class="stats">${ATTRS.filter(([k]) => k !== 'ref' || p.pos === 'GOL').map(([k, l]) => `<div class="stat"><span class="k">${l}</span><span class="bar"><b style="width:${p[k]}%"></b></span><span class="v">${p[k]}</span>${train ? `<button class="plus" data-act="up" data-i="${i}" data-k="${k}" ${p[k] >= 99 || S.money < trainCost(p[k]) ? 'disabled style="opacity:.4"' : ''} aria-label="Treinar ${l}">+1 · ${brl(trainCost(p[k]))}</button>` : '<span></span>'}</div>`).join('')}</div>`;
+  return `${p.sk && SKILLS[p.sk] ? `<div class="kv"><span class="muted">Habilidade</span><b style="color:var(--good)">${SKILLS[p.sk][0]}</b></div>` : ''}<div class="stats">${ATTRS.filter(([k]) => k !== 'ref' || p.pos === 'GOL').map(([k, l]) => `<div class="stat"><span class="k">${l}</span><span class="bar"><b style="width:${p[k]}%"></b></span><span class="v">${p[k]}</span>${train ? `<button class="plus" data-act="up" data-i="${i}" data-k="${k}" ${p[k] >= 99 || S.money < trainCost(p[k]) ? 'disabled style="opacity:.4"' : ''} aria-label="Treinar ${l}">+1 · ${brl(trainCost(p[k]))}</button>` : '<span></span>'}</div>`).join('')}</div>`;
 }
 function rosterView() {
   const t = T('user'), f = formOf(t);
@@ -2585,15 +2810,110 @@ function fichaCard(p) {
     ${h.clubs.length ? `<div class="kv"><span class="muted">Clubes anteriores</span><span style="text-align:right">${h.clubs.slice(-5).map(esc).join(', ')}</span></div>` : ''}
     <div class="kv"><span class="muted">Comemoração</span><span>${esc(p.celeb || CELEBS[p.id % CELEBS.length])}</span></div>`;
 }
+let expC = null, copTeam = null;
+const potLabel = p => p.pot >= 85 ? 'Craque em potencial' : p.pot >= 75 ? 'Potencial alto' : p.pot >= 65 ? 'Potencial médio' : 'Potencial baixo';
+function copaView() {
+  const c = S.cop; if (!c) return '<div class="card"><div class="muted">A Copinha começa na próxima temporada.</div></div>';
+  const k = sub.cop || 'jogos';
+  const head = `<div class="card"><span class="label">Copa São Paulo de Futebol Júnior ${2025 + c.s}</span>
+    <h2>${c.champ ? `Campeão: ${esc(T(c.champ).name)}` : esc(COP_PH[Math.min(c.phase, 6)])}</h2>
+    <div class="muted" style="font-size:13px">${c.champ ? `Vice: ${esc(T(c.vice).name)}. Os destaques valorizaram: dá para contratá-los para a sua base.` : `Uma fase é disputada a cada partida do calendário. ${c.phase === 0 ? 'A bola ainda não rolou: veja os grupos.' : ''}`}</div>
+    ${S.copMsg ? `<div style="color:${S.copMsg.ok ? 'var(--good)' : 'var(--amber)'};font-size:14px;margin-top:6px">${esc(S.copMsg.text)}</div>` : ''}</div>`;
+  return head + seg('sub-cop', k, [['jogos', 'Jogos'], ['grupos', 'Grupos'], ['dest', 'Destaques'], ['base', 'Sua base'], ['times', 'Times']]).replace('class="seg"', 'class="seg wrap"')
+    + { jogos: copGames, grupos: copGroups, dest: copStars, base: copMine, times: copTeams }[k]();
+}
+function copGameRow(g) {
+  const u = g.h === 'user' || g.a === 'user', w = copWinner(g);
+  return `<div class="cop-g${u ? ' mine' : ''}"><span class="cop-t" style="${w === g.h ? 'font-weight:700' : ''}">${esc(T(g.h).name)} ${crest(T(g.h), 18)}</span><b class="cop-s">${g.hg} x ${g.ag}</b><span class="cop-t r" style="${w === g.a ? 'font-weight:700' : ''}">${crest(T(g.a), 18)} ${esc(T(g.a).name)}</span>
+    ${g.pen || g.sc.h.length || g.sc.a.length ? `<span class="cop-x">${g.pen ? `Pênaltis: ${g.pen[0]} x ${g.pen[1]}. ` : ''}${g.sc.h.concat(g.sc.a).length ? 'Gols: ' + esc(g.sc.h.concat(g.sc.a).join(', ')) : ''}</span>` : ''}</div>`;
+}
+function copGames() {
+  const c = S.cop, out = [];
+  if (!c.champ) {
+    let nx = [];
+    if (c.phase < 3) { const pr = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]][c.phase]; for (const g of c.groups) for (const [i, j] of pr) nx.push([g[i], g[j]]); }
+    else nx = c.ko;
+    out.push(`<div class="card"><span class="label">Próximos jogos · ${COP_PH[c.phase]}</span>${nx.map(([h, a]) => `<div class="cop-g${h === 'user' || a === 'user' ? ' mine' : ''}"><span class="cop-t">${esc(T(h).name)} ${crest(T(h), 18)}</span><b class="cop-s muted">x</b><span class="cop-t r">${crest(T(a), 18)} ${esc(T(a).name)}</span></div>`).join('')}</div>`);
+  }
+  for (let ph = Math.min(c.phase, 7) - 1; ph >= 0; ph--) {
+    const gs = c.games.filter(g => g.ph === ph).sort((x, y) => ((y.h === 'user' || y.a === 'user') - (x.h === 'user' || x.a === 'user')));
+    out.push(`<div class="card"><span class="label">${COP_PH[ph]}</span>${gs.map(copGameRow).join('')}</div>`);
+  }
+  return out.join('');
+}
+function copGroups() {
+  return S.cop.groups.map((g, i) => `<div class="card"><span class="label">Grupo ${'ABCDEFGH'[i]}</span>
+    <div class="cop-row cop-hd"><span>Clube</span><span>P</span><span>J</span><span>SG</span><span>GP</span></div>
+    ${copTable(g).map((r, k) => `<div class="cop-row${r.id === 'user' ? ' mine' : ''}"><span class="cop-t">${k < 2 && S.cop.phase >= 3 ? '<b style="color:var(--good)">›</b> ' : ''}${crest(T(r.id), 18)} ${esc(T(r.id).name)}</span><b>${r.pts}</b><span>${r.j}</span><span>${r.gp - r.gc}</span><span>${r.gp}</span></div>`).join('')}</div>`).join('');
+}
+function copPRow(id, p) {
+  const st = S.cop && S.cop.st[p.id], open = expC === p.id, mine = id === 'user', ask = youthAsk(p, id);
+  return `<button class="prow" data-act="expC" data-i="${p.id}" aria-expanded="${open}">${crest(T(id), 28)}<span style="min-width:0"><span class="nm">${esc(p.name)}${skTag(p)}${(p.hype || 1) > 1.1 ? ' <span class="tag gold">Destaque</span>' : ''}${mine ? ' <span class="tag">Sua base</span>' : ''}</span><br><span class="meta"><span class="pos-tag">${p.pos}</span> ${p.age} anos · ${st && st.j ? `${st.j} j · ${st.g} gol${st.g === 1 ? '' : 's'} · nota ${copAvg(st).toFixed(1)}` : 'não jogou'} · ${brl(ask)}</span></span><span class="ov">${pOvr(p)}</span></button>
+  ${open ? `<div class="expand">${statRows(p, 0, false)}
+    <div class="kv"><span class="muted">Clube</span><span>${esc(T(id).name)}</span></div>
+    <div class="kv"><span class="muted">Potencial</span><span>${potLabel(p)}${T('user').staff.olh >= 3 ? ` (${p.pot})` : ''}</span></div>
+    <div class="kv"><span class="muted">${mine ? 'Valor estimado' : 'Pedida do clube'}</span><b>${brl(ask)}</b></div>
+    ${mine ? `<button class="btn small" data-act="go" data-t="squad" data-k="squad" data-v="youth">Ver na base</button>` : `<div class="btns">${[[.8, 'Oferecer 80%'], [1, 'Pagar a pedida']].map(([pc, l]) => `<button class="btn small ${pc === 1 ? 'primary' : ''}" data-act="cbuy" data-tid="${id}" data-pid="${p.id}" data-v="${pc}" ${S.money < Math.round(ask * pc / 10) * 10 || S.ban ? 'disabled' : ''}>${l}<br><span class="muted">${brl(Math.round(ask * pc / 10) * 10)}</span></button>`).join('')}</div>
+    <span class="muted" style="font-size:12px">O jogador vai para a sua base (máximo de 16). Depois é só promover ao elenco principal.</span>`}
+  </div>` : ''}`;
+}
+function copStars() {
+  const c = S.cop, all = copPlayers();
+  if (!all.length) return '<div class="card"><div class="muted">Os destaques aparecem depois da primeira rodada.</div></div>';
+  const aw = c.awards, art = all.slice().sort((a, b) => b.st.g - a.st.g || copAvg(b.st) - copAvg(a.st)).slice(0, 8);
+  const best = all.filter(x => x.st.j >= Math.min(2, c.phase)).sort((a, b) => copAvg(b.st) - copAvg(a.st)).slice(0, 20);
+  return `${aw ? `<div class="card"><span class="label">Prêmios da Copinha</span>
+      ${aw.craque ? `<div class="kv"><span class="muted">Craque</span><span><b>${esc(aw.craque.name)}</b> · ${esc(T(aw.craque.id).name)} · nota ${aw.craque.r}</span></div>` : ''}
+      ${aw.art ? `<div class="kv"><span class="muted">Artilheiro</span><span><b>${esc(aw.art.name)}</b> · ${esc(T(aw.art.id).name)} · ${aw.art.g} gols</span></div>` : ''}
+      <span class="label" style="margin-top:8px">Seleção da Copinha</span>${aw.sel.filter(Boolean).map(x => `<div class="kv"><span><span class="pos-tag">${x.pos}</span> <b>${esc(x.name)}</b></span><span class="muted">${esc(T(x.id).abbr)} · ${x.r}</span></div>`).join('')}</div>` : ''}
+    <div class="card"><span class="label">Artilharia</span>${art.map((x, i) => `<div class="kv"><span>${i + 1}. <b>${esc(x.p.name)}</b> <span class="muted">${esc(T(x.id).name)}</span></span><b>${x.st.g}</b></div>`).join('')}</div>
+    <div class="card"><span class="label">Melhores jogadores · toque para negociar</span><div class="list">${best.map(x => copPRow(x.id, x.p)).join('')}</div></div>`;
+}
+function copMine() {
+  const sq = S.youth.slice().sort((a, b) => copAvg(S.cop.st[b.id]) - copAvg(S.cop.st[a.id]) || pOvr(b) - pOvr(a));
+  return ybidsCard() + `<div class="card"><span class="label">Elenco da base do ${esc(T('user').name)}</span><div class="muted" style="font-size:13px">Quem vai bem na Copinha valoriza e recebe propostas. Os 11 mais fortes jogam; um reserva entra em cada jogo.</div>
+    <div class="list">${sq.map(p => copPRow('user', p)).join('')}</div></div>`;
+}
+function copTeams() {
+  const c = S.cop;
+  if (copTeam && c.teams.includes(copTeam)) return `<div class="card"><button class="linkbtn" data-act="copteam" data-v="">‹ Voltar aos times</button><div class="row" style="margin-top:6px">${crest(T(copTeam), 40)}<div><h2>${esc(T(copTeam).name)}</h2><div class="muted">Base · força ${Math.round(copStr(copTeam))}</div></div></div></div>
+    <div class="card"><div class="list">${copSquad(copTeam).slice().sort((a, b) => pOvr(b) - pOvr(a)).map(p => copPRow(copTeam, p)).join('')}</div></div>`;
+  const alive = new Set(c.champ ? [c.champ] : c.phase >= 3 ? c.ko.flat() : c.teams);
+  return `<div class="card"><div class="list">${c.teams.slice().sort((a, b) => copStr(b) - copStr(a)).map(id => `<button class="prow" data-act="copteam" data-v="${id}">${crest(T(id), 28)}<span style="min-width:0"><span class="nm">${esc(T(id).name)}${id === 'user' ? ' <span class="tag gold">Você</span>' : ''}</span><br><span class="meta">força ${Math.round(copStr(id))} · grupo ${'ABCDEFGH'[c.groups.findIndex(g => g.includes(id))]}${alive.has(id) ? '' : ' · eliminado'}</span></span><span class="ov">›</span></button>`).join('')}</div></div>`;
+}
+function ybidsCard() {
+  const L = (S.ybids || []).map((b, i) => { const [BL, k] = baseFind(b.pid), p = BL && BL[k]; if (!p) return ''; const who = b.club || T(b.tid).name;
+    return `<div class="offer"><div><b>${esc(who)}</b>${b.giant ? ' <span class="tag gold">Gigante europeu</span>' : ''} quer ${esc(p.name)} <span class="muted">(${p.age} anos${BL === S.kids ? ', sub-17' : ''})</span><div class="muted" style="font-size:13px">Oferta ${brl(b.amount)} · valor estimado ${brl(youthAsk(p, 'user'))}${b.c ? ' · já negociado' : ''}</div></div><div class="btns"><button class="btn small primary" data-act="ybY" data-i="${i}">Vender</button>${b.c ? '' : `<button class="btn small" data-act="ybC" data-i="${i}">Pedir mais</button>`}<button class="btn small" data-act="ybN" data-i="${i}">Recusar</button></div></div>`; }).join('');
+  return L ? `<div class="card alert"><span class="label">Propostas pela sua base</span>${L}</div>` : '';
+}
+function scoutView() {
+  const u = T('user'), olh = u.staff.olh || 1, ms = S.missions || [], found = S.scoutFound || [], kids = S.kids || [], seePot = olh >= 3;
+  const can = ms.length < maxMissions();
+  const kidRow = (p, k, list) => { const open = expK === list + p.id;
+    return `<button class="prow" data-act="expK" data-i="${list}${p.id}" aria-expanded="${open}"><span class="pnum" style="border-color:var(--line);font-size:10px">${p.pos}</span><span style="min-width:0"><span class="nm">${esc(p.name)}${skTag(p)}</span><br><span class="meta">${p.age} anos · ${potLabel(p)}${seePot ? ` (${p.pot})` : ''}${p.from ? ` · ${esc(p.from)}` : ''}${list === 'f' ? ` · decide em ${p.exp} rodada${p.exp === 1 ? '' : 's'}` : ''}</span></span><span class="ov">${pOvr(p)}</span></button>
+    ${open ? `<div class="expand">${statRows(p, 0, false)}
+      ${list === 'f' ? `<div class="btns"><button class="btn small primary" data-act="kidY" data-i="${k}" ${S.money < kidFee(p) || kids.length >= 10 ? 'disabled' : ''}>Contratar · ${brl(kidFee(p))}</button><button class="btn small" data-act="kidN" data-i="${k}">Dispensar</button></div>${kids.length >= 10 ? '<span class="muted" style="font-size:12px">O sub-17 está cheio (10).</span>' : ''}`
+        : `<div class="kv"><span class="muted">Valor estimado</span><span>${brl(youthAsk(p, 'user'))}</span></div><div class="btns"><button class="btn small" data-act="kidUp" data-i="${k}" ${S.youth.length >= 16 ? 'disabled' : ''}>Subir já para o sub-20</button><button class="btn small" data-act="kidOut" data-i="${k}">Liberar</button></div>`}</div>` : ''}`; };
+  return ybidsCard() + `<div class="card"><span class="label">Olheiro · nível ${olh}</span><div class="muted" style="font-size:13px">Mande o olheiro a um estado. Em 3 rodadas ele volta com 2 a 4 meninos de 14 a 16 anos. Quanto melhor o olheiro (Clube › Comissão), maior o potencial e mais chance de virem com habilidade. Os contratados ficam no sub-17 e, na temporada seguinte, sobem para o sub-20 e jogam a Copinha.</div>
+    ${ms.map(m => `<div class="kv"><span>Em ${esc(SCOUT_UF[m.uf][0])}</span><span class="muted">volta em ${m.left} rodada${m.left === 1 ? '' : 's'}</span></div>`).join('')}</div>
+  <div class="card"><span class="label">Enviar olheiro</span>
+    <select id="scout-uf">${Object.entries(SCOUT_UF).map(([k, v]) => `<option value="${k}" ${k === (S.lastUf || 'RS') ? 'selected' : ''}>${v[0]} · ${v[1]} · ${brl(scoutCost(k))}</option>`).join('')}</select>
+    <button class="btn primary" data-act="scout" ${can ? '' : 'disabled'}>${can ? 'Enviar olheiro' : `Olheiro em viagem${maxMissions() === 1 ? ' (nível 4 permite duas viagens ao mesmo tempo)' : ''}`}</button>
+    ${S.scoutMsg ? `<span style="color:var(--amber);font-size:13px">${esc(S.scoutMsg)}</span>` : ''}</div>
+  <div class="card"><span class="label">Relatórios do olheiro</span>${found.length ? `<div class="list">${found.map((p, k) => kidRow(p, k, 'f')).join('')}</div>` : '<div class="muted">Nenhuma indicação no momento.</div>'}</div>
+  <div class="card"><span class="label">Sub-17 (${kids.length}/10)</span>${kids.length ? `<div class="list">${kids.map((p, k) => kidRow(p, k, 'k')).join('')}</div>` : '<div class="muted">Nenhum garoto contratado ainda.</div>'}</div>`;
+}
+const kidFee = p => Math.round((40 + Math.max(0, p.pot - 60) * 6 + (p.sk ? 40 : 0)) / 10) * 10;
+let expK = null;
 function youthView() {
   const t = T('user');
-  return `<div class="card"><span class="label">Categorias de base · nível ${S.baseLvl}</span><div class="muted">Chegam 3 promessas por temporada; o olheiro e o nível da base melhoram o potencial delas. Jovens evoluem rápido até os 23 anos.</div></div>
+  return ybidsCard() + `<div class="card"><span class="label">Categorias de base · nível ${S.baseLvl}</span><div class="muted">Chegam 3 promessas por temporada; o olheiro e o nível da base melhoram o potencial delas. Jovens evoluem rápido até os 23 anos. Todo começo de temporada a base disputa a Copinha (aba ao lado).</div></div>
   <div class="card"><div class="list">${S.youth.map((p, i) => {
     const open = expY === i, potL = p.pot >= 85 ? 'Craque em potencial' : p.pot >= 75 ? 'Potencial alto' : p.pot >= 65 ? 'Potencial médio' : 'Potencial baixo';
-    return `<button class="prow" data-act="expY" data-i="${i}" aria-expanded="${open}"><span class="pnum" style="border-color:var(--line);font-size:10px">${p.pos}</span><span style="min-width:0"><span class="nm">${esc(p.name)}</span><br><span class="meta">${POSN[p.pos]} · ${p.age} anos · ${potL}</span></span><span class="ov">${pOvr(p)}</span></button>
+    return `<button class="prow" data-act="expY" data-i="${i}" aria-expanded="${open}"><span class="pnum" style="border-color:var(--line);font-size:10px">${p.pos}</span><span style="min-width:0"><span class="nm">${esc(p.name)}</span><br><span class="meta">${p.sk ? esc(skName(p)) + ' · ' : ''}${POSN[p.pos]} · ${p.age} anos · ${potL} · vale ${brl(youthAsk(p, 'user'))}${(p.hype || 1) > 1.1 ? ' · destaque da Copinha' : ''}${p.ysale ? ' · no mercado' : ''}</span></span><span class="ov">${pOvr(p)}</span></button>
     ${open ? `<div class="expand">${statRows(p, i, false)}
       <div class="selrow"><span class="label">Promover</span><select id="promo-sel">${t.players.length < MAX_SQ ? '<option value="add">Adicionar ao elenco</option>' : ''}${t.players.slice(11).map((q, j) => `<option value="${j + 11}">${esc(q.name)} (${q.pos}, ${pOvr(q)})</option>`).join('')}</select></div>
-      <div class="btns"><button class="btn small primary" data-act="promo" data-i="${i}">Promover ao elenco</button><button class="btn small" data-act="dismiss" data-i="${i}">Dispensar</button></div></div>` : ''}`;
+      <div class="btns"><button class="btn small primary" data-act="promo" data-i="${i}">Promover ao elenco</button><button class="btn small" data-act="ysale" data-i="${i}">${p.ysale ? 'Tirar do mercado' : 'Colocar no mercado'}</button><button class="btn small" data-act="dismiss" data-i="${i}">Dispensar</button></div></div>` : ''}`;
   }).join('') || '<span class="muted">Nenhuma promessa na base agora.</span>'}</div></div>`;
 }
 const buyPrice = p => Math.round(value(p) * 1.2 / 10) * 10;
@@ -2984,6 +3304,42 @@ document.addEventListener('click', e => {
   else if (a === 'eclose') { editId = null; render(); }
   else if (a === 'expP') { expP = expP === i ? null : i; render(true); }
   else if (a === 'expY') { expY = expY === i ? null : i; render(true); }
+  else if (a === 'expK') { const k = b.dataset.i; expK = expK === k ? null : k; render(true); }
+  else if (a === 'scout') { const uf = $('scout-uf').value; S.lastUf = uf; S.scoutMsg = sendScout(uf) ? null : 'Verba insuficiente ou olheiro já em viagem.'; save(); render(true); }
+  else if (a === 'kidY') { const p = S.scoutFound[i]; S.kids = S.kids || []; if (!p || S.money < kidFee(p) || S.kids.length >= 10) return; addMoney(-kidFee(p), 'Contratações'); S.scoutFound.splice(i, 1); delete p.exp; S.kids.push(p); expK = null; news(`${T('user').name} contrata ${p.name}, ${p.age} anos, descoberto pelo olheiro em ${p.from}.`, 'Base', 'user'); save(); render(true); }
+  else if (a === 'kidN') { S.scoutFound.splice(i, 1); expK = null; save(); render(true); }
+  else if (a === 'kidUp') { const p = S.kids[i]; if (!p || S.youth.length >= 16) return; S.kids.splice(i, 1); S.youth.push(p); expK = null; save(); render(true); }
+  else if (a === 'kidOut') { S.kids.splice(i, 1); expK = null; save(); render(true); }
+  else if (a === 'sub-cop') { sub.cop = v; expC = null; copTeam = null; S.copMsg = null; render(); }
+  else if (a === 'expC') { const k = +b.dataset.i; expC = expC === k ? null : k; render(true); }
+  else if (a === 'copteam') { copTeam = v || null; expC = null; render(); }
+  else if (a === 'ysale') { const p = S.youth[i]; if (p) p.ysale = !p.ysale; save(); render(true); }
+  else if (a === 'cbuy') {
+    const tid = b.dataset.tid, pid = +b.dataset.pid, sq = S.cop && S.cop.squads[tid], p = sq && sq.find(q => q.id === pid), u = T('user'); if (!p) return;
+    const ask = youthAsk(p, tid), fee = Math.round(ask * +v / 10) * 10;
+    const msg = (ok, text) => { S.copMsg = { ok, text }; save(); render(true); };
+    if (S.ban) return msg(false, 'Seu clube está punido por dívidas e não pode contratar.');
+    if (S.youth.length >= 16) return msg(false, 'A base está cheia (16 jogadores). Promova ou dispense alguém antes.');
+    if (S.money < fee) return msg(false, 'Verba insuficiente.');
+    if (Math.random() > (+v >= 1 ? .85 : .4 - ((p.hype || 1) - 1) * .4)) { S.ask[pid] = (S.ask[pid] || 1) * 1.08; return msg(false, `O ${T(tid).name} recusou a proposta e subiu a pedida por ${p.name}.`); }
+    sq.splice(sq.indexOf(p), 1); S.youth.push(p); moveP(p, T(tid)); addMoney(-fee, 'Contratações'); if (hasFin(tid)) FIN(T(tid)).cash += fee;
+    logTransfer(p.name, T(tid).name, u.name, fee, 'base', p);
+    news(`${u.name} contrata ${p.name}, da base do ${T(tid).name}, por ${brl(fee)}.`, 'Base', 'user');
+    expC = null; return msg(true, `${p.name} é do ${u.name}! Ele está na sua base: promova ao elenco principal quando quiser.`);
+  }
+  else if (a === 'ybY' || a === 'ybN' || a === 'ybC') {
+    const bd = (S.ybids || [])[i]; if (!bd) return; const [BL, k] = baseFind(bd.pid), p = BL && BL[k], who = bd.club || T(bd.tid).name;
+    if (!p) { S.ybids.splice(i, 1); save(); render(true); return; }
+    if (a === 'ybY') {
+      BL.splice(k, 1); moveP(p, T('user')); addMoney(bd.amount, 'Vendas');
+      if (bd.tid) { if (hasFin(bd.tid)) FIN(T(bd.tid)).cash -= bd.amount; if (S.cop) (S.cop.squads[bd.tid] = S.cop.squads[bd.tid] || []).push(p); }
+      logTransfer(p.name, T('user').name, who, bd.amount, bd.club ? 'exterior' : 'base', p);
+      news(`${T('user').name} vende ${p.name}, da base, ao ${who} por ${brl(bd.amount)}.`, 'Base', 'user');
+      S.ybids = S.ybids.filter(x => x.pid !== p.id); if (expY != null) expY = null;
+    } else if (a === 'ybN') { S.ybids.splice(i, 1); news(`${T('user').name} recusa a proposta do ${who} por ${p.name}.`, 'Base', 'user'); }
+    else { if (Math.random() < .55) { bd.amount = Math.round(bd.amount * rnd(1.1, 1.25) / 10) * 10; bd.c = true; news(`${who} melhora a proposta por ${p.name}: agora ${brl(bd.amount)}.`, 'Proposta', 'user'); } else { S.ybids.splice(i, 1); news(`${who} desiste de ${p.name} depois do pedido de aumento.`, 'Base', 'user'); } }
+    save(); render(true);
+  }
   else if (a === 'expM') { const k = /^\d+$/.test(b.dataset.i) ? +b.dataset.i : b.dataset.i; expM = expM === k ? null : k; render(true); }
   else if (a === 'up') { const p = T('user').players[i], k = b.dataset.k, c = trainCost(p[k]); if (S.money >= c && p[k] < 99) { addMoney(-c, 'Treinos'); p[k]++; save(); render(true); } }
   else if (a === 'renew') { const p = T('user').players[i], c = Math.round(value(p) * .15); if (S.money >= c) { addMoney(-c, 'Contratos'); p.ct += 3; news(`${p.name} renova contrato por mais 3 temporadas.`, 'Contrato'); save(); render(true); } }
