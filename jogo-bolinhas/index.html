@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c1d22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bolinhas">
 <title>Liga das Bolinhas</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1938,6 +1946,26 @@ function takeOver(id) {
    ===================================================================== */
 try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); PID = S.pid || 1; const dft = defaults(); for (const k in dft) if (S[k] === undefined) S[k] = dft[k]; if (!S.divisions.D) S.divisions.D = []; if (!S.fixtures.D) { S.fixtures.D = []; S.results.D = []; } for (const c of ['ne', 'vd', 'sup', 'rec']) if (!S.cups[c]) S.cups[c] = { id: c, teams: [], alive: null, results: [], champion: null }; if (!S.cups.pre) S.cups.pre = { id: 'pre', teams: [], alive: [], results: [], champion: null }; if (S.cups.cdb && S.cups.cdb.teams.length === 32 && S.cal.some(x => x.c === 'cdb')) { S.cups.cdb0 = S.cups.cdb; S.cups.cdb0.id = 'cdb0'; S.cal.forEach(x => { if (x.c === 'cdb') x.c = 'cdb0'; }); S.cups.cdb = { id: 'cdb', teams: [], alive: null, results: [], champion: null }; } for (const c of ['lib', 'sul']) { const its = S.cal.filter(x => x.c === c); if (S.cups[c] && its.length && its.length !== CUPS[c].stages.length) { S.cups[c + '0'] = S.cups[c]; S.cups[c + '0'].id = c + '0'; its.forEach(x => { x.c = c + '0'; }); S.cups[c] = { id: c, teams: [], groups: null, alive: null, results: [], champion: null }; } } if (S.pre === null && S.ci > 0) S.pre = 'tatico'; if (!S.stars || !S.stars.length) refreshStars(); if (!S.agesFixed) { for (const t of Object.values(S.teams)) { const ag = AGES[t.name], sq = SQUADS[t.name]; if (!ag || !sq) continue; for (const p of t.players) { const k = sq.indexOf(p.name); if (k >= 0 && ag[k]) { p.age = ag[k] + (S.season - 1); if (p.age > 23) p.pot = Math.min(p.pot, Math.max(pOvr(p), p.pot)); } } } S.agesFixed = true; } if (!S.namesV2) { realNames(); S.namesV2 = true; } } } catch (e) { S = null; }
 const save = () => { if (!S) return; S.pid = PID; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const bkMsg = t => { const e = document.getElementById('bkMsg'); if (e) e.textContent = t; };
+async function exportSave() {
+  if (!S) return; save();
+  const d = new Date(), name = `liga-bolinhas-save-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
+  const blob = new Blob([JSON.stringify({ app: 'liga-bolinhas', v: 1, save: S })], { type: 'application/json' });
+  try { const dl = window.claude && await window.claude.use('downloads'); if (dl) { await dl.save({ filename: name, data: blob }); bkMsg('Save exportado: ' + name); return; } } catch (e) { if (e && e.code === 'declined') { bkMsg('Exportação cancelada.'); return; } }
+  try { const f = new File([blob], name, { type: 'application/json' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: 'Save Liga das Bolinhas' }); bkMsg('Save exportado.'); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  bkMsg('Save exportado: ' + name);
+}
+function importSave() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (!f) return; const r = new FileReader();
+    r.onload = () => { try { const o = JSON.parse(r.result), sv = o && o.save ? o.save : o;
+      if (!sv || !sv.teams || !sv.divisions || !sv.season) throw 0;
+      localStorage.setItem(KEY, JSON.stringify(sv)); bkMsg('Save carregado! Abrindo a carreira…'); setTimeout(() => location.reload(), 400);
+    } catch (e) { bkMsg('Esse arquivo não é um save válido da Liga das Bolinhas.'); } };
+    r.readAsText(f); };
+  inp.click();
+}
 
 /* =====================================================================
    INTERFACE
@@ -1994,6 +2022,7 @@ function drawFormation(c, f) {
 }
 
 /* ---------- criar carreira ---------- */
+const IMP_CARD = '<div class="card"><span class="label">Já tem uma carreira?</span><div class="muted" style="font-size:13px">Carregue o arquivo de save que você exportou em outro aparelho ou no app.</div><div class="btns"><button class="btn small" data-act="imp">Importar save</button></div><div id="bkMsg" class="muted" style="font-size:13px"></div></div>';
 function createView() {
   const modeSeg = `<div class="seg"><button data-act="mode" data-m="real" aria-pressed="${draft.mode === 'real'}">Treinar clube real</button><button data-act="mode" data-m="own" aria-pressed="${draft.mode === 'own'}">Criar meu time</button></div>`;
   const asTeam = c => ({ c1: c[2], c2: c[3], pt: c[4], abbr: c[1] });
@@ -2004,7 +2033,8 @@ function createView() {
       <div class="row">${badge(asTeam(sel), 'lg')}<div style="min-width:0"><span class="label">${DIVNAME[rd]} 2026 · ${sel[5]}</span><h2>${esc(sel[0])}</h2><div class="muted">${esc(st[0])} · ${num(st[1])} lugares · verba inicial ${brl(ECON.start[rd])}</div></div></div>
       ${DIVS.map(d => `<span class="label">${DIVNAME[d]}</span><div class="clubs">${CLUBS[d].map((c, i) => `<button class="club-btn" data-act="real" data-d="${d}" data-i="${i}" aria-pressed="${d === rd && i === ri}">${badge(asTeam(c))}<span>${esc(c[0])}</span></button>`).join('')}</div>`).join('')}
       <div class="start-bar"><button class="btn primary" style="width:100%" data-act="create">Começar com o ${esc(sel[0])}</button></div>
-    </div>`;
+    </div>
+    ${IMP_CARD}`;
   }
   const sw = key => `<div class="swatches">${COLORS.map(c => `<button class="sw" data-act="color" data-k="${key}" data-c="${c}" style="background:${c}" aria-label="Cor ${c}" aria-pressed="${draft[key] === c}"></button>`).join('')}</div>`;
   return `${modeSeg}
@@ -2025,7 +2055,8 @@ function createView() {
       <select id="c-repl">${CLUBS.C.map((c, i) => `<option value="${i}" ${i === draft.replace ? 'selected' : ''}>${esc(c[0])}</option>`).join('')}</select>
     </div>
     <button class="btn primary" data-act="create">Começar carreira</button>
-  </div>`;
+  </div>
+  ${IMP_CARD}`;
 }
 function readDraft() {
   if (!$('c-name')) return;
@@ -2643,7 +2674,9 @@ function moneyView() {
   </div>
   <div class="card"><span class="label">Carreira</span>
     <div class="btns"><button class="btn small" data-act="tutorial">Ver tutorial</button><span class="confirm" id="resetBox"><button class="btn small" data-act="reset1">Recomeçar do zero</button></span></div>
-  </div>`;
+  </div>
+  <div class="card"><span class="label">Backup do save</span><div class="muted" style="font-size:13px">Exporte sua carreira para um arquivo e importe em outro aparelho ou no app instalado.</div>
+    <div class="btns"><button class="btn small" data-act="exp">Exportar save</button><button class="btn small" data-act="imp">Importar save</button></div><div id="bkMsg" class="muted" style="font-size:13px"></div></div>`;
 }
 const NEWS_SEC = { 'Seu jogo': 'Seu clube', Resultado: 'Rodada', Rodada: 'Rodada', Tabela: 'Rodada', 'Série C': 'Rodada', Mercado: 'Mercado', Proposta: 'Mercado', Rumor: 'Mercado', Empréstimo: 'Mercado', Contrato: 'Mercado', Base: 'Mercado',
   Lesão: 'Médico', Suspensão: 'Médico', Polêmica: 'Polêmica', Torcida: 'Polêmica', Entrevista: 'Polêmica', Eleição: 'Bastidores', SAF: 'Bastidores', Finanças: 'Bastidores', Estrutura: 'Bastidores', Patrocínio: 'Bastidores', Comissão: 'Bastidores', Carreira: 'Bastidores', Elenco: 'Seu clube',
@@ -2818,6 +2851,8 @@ document.addEventListener('click', e => {
   else if (a === 'tutorial') { tab = 'home'; render(); startTutorial(true); }
   else if (a === 'reset1') { $('resetBox').innerHTML = '<button class="btn small" data-act="reset2" style="background:var(--bad);color:#2a0606;border-color:var(--bad)">Apagar tudo</button><button class="btn small" data-act="reset0">Cancelar</button>'; }
   else if (a === 'reset0') render(true);
+  else if (a === 'exp') exportSave();
+  else if (a === 'imp') importSave();
   else if (a === 'reset2') { S = null; try { localStorage.removeItem(KEY); } catch (err) {} tab = 'home'; render(); }
 });
 document.addEventListener('change', e => {
@@ -3376,7 +3411,7 @@ $('tskip').addEventListener('click', endTut);
 $('help').addEventListener('click', () => { if (!S || S.fired) return; tab = 'home'; render(); startTutorial(true); });
 
 /* instalar como aplicativo (funciona quando o jogo é hospedado com o manifest e o service worker da pasta) */
-try { if (location.protocol === 'https:' && !/claude/.test(location.hostname)) { const l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.webmanifest'; document.head.appendChild(l); if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {}); } } catch (e) {}
+try { if (location.protocol === 'https:' && !/claude/.test(location.hostname)) { const l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.webmanifest'; document.head.appendChild(l); const ai = document.createElement('link'); ai.rel = 'apple-touch-icon'; ai.href = 'icon-180.png'; document.head.appendChild(ai); if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {}); } } catch (e) {}
 
 window.__liga = { setSta: k => { STA_K = k; }, tune: o => { if (o.q != null) Q_K = o.q; if (o.day != null) DAY_SD = o.day; if (o.drib != null) DRIB = o.drib; if (o.shot != null) SHOT_D = o.shot; if (o.home != null) HOME_K = o.home; }, runMatch, ovr, T: id => S.teams[id], makeSquad, makeTeam, createMatch, step, get S() { return S; } };
 if (S && !S.fired) { advanceAuto(); save(); }
