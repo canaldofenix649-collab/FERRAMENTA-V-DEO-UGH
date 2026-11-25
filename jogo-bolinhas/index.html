@@ -1446,7 +1446,7 @@ function refreshStars() {
   S.stars = (S.stars || []).filter(p => p.age < 40).concat(shuffle(left).slice(0, Math.max(0, 5 - (S.stars || []).length)).map(makeStar));
 }
 function starSigned(p, t, fee) {
-  if (t.id !== 'user') logTransfer(p.name, p.from, t.name, fee, 'astro', p);
+  if (t.id !== 'user') { logTransfer(p.name, p.from, t.name, fee, 'astro', p); if (hasFin(t.id)) FIN(t).cash -= fee; }
   S.starsUsed.push(p.name); S.stars = S.stars.filter(x => x !== p);
   const tp = posTxt(t.id);
   news(`Bomba no mercado: ${t.name} anuncia ${p.name}, ex-${p.from}.`, 'Mercado', t.id,
@@ -1454,7 +1454,8 @@ function starSigned(p, t, fee) {
 }
 function aiStarSigning() {
   if (!S.stars.length || Math.random() > .14) return;
-  const p = pick(S.stars), buyer = T(pick(S.divisions.A.slice(0, 12).filter(id => id !== 'user')));
+  const p = pick(S.stars), rich = S.divisions.A.filter(id => hasFin(id) && !FIN(T(id)).ban && FIN(T(id)).cash > value(p) * 1.5 + wageBill(T(id)) * 2); if (!rich.length) return;
+  const buyer = T(pick(rich));
   const w = buyer.players.map((q, k) => [q, k]).filter(([q, k]) => k >= 1 && k <= 10 && q.pos === p.pos).sort((a, b) => pOvr(a[0]) - pOvr(b[0]))[0] || [buyer.players[10], 10];
   const out = w[0]; buyer.players[w[1]] = p; p.num = out.num; moveP(p, null); HI(p).clubs.push(p.from); S.free.push(out); moveP(out, buyer);
   starSigned(p, buyer, Math.round(value(p) * 1.5 / 10) * 10);
@@ -1465,8 +1466,10 @@ function rumorTick(r) {
     if (r - x.r0 < 2) return true;
     const buyer = T(x.buyer), from = T(x.from), p = findP(from, x.pid);
     if (!p || !windowOpen()) { news(`Esfriou: ${buyer.name} desiste de ${x.name}.`, 'Rumor', x.buyer, `A diretoria do ${buyer.name} considerou o pedido do ${from.name} alto demais e encerrou as conversas. ${x.name} segue no clube.`); return false; }
-    if (Math.random() < .55) {
-      const fee = Math.round(value(p) * rnd(1.2, 1.6) / 10) * 10, i = from.players.indexOf(p);
+    const fee0 = Math.round(value(p) * rnd(1.2, 1.6) / 10) * 10, okFin = !hasFin(x.buyer) || (!FIN(buyer).ban && FIN(buyer).cash - fee0 > -wageBill(buyer) * (FIN(buyer).risk > .75 ? 9 : 0));
+    if (okFin && Math.random() < .55) {
+      const fee = fee0, i = from.players.indexOf(p);
+      if (hasFin(x.buyer)) FIN(buyer).cash -= fee; if (hasFin(x.from)) FIN(from).cash += fee;
       const w = buyer.players.map((q, k) => [q, k]).filter(([, k]) => k >= 1 && k <= 10).sort((a, b) => pOvr(a[0]) - pOvr(b[0]))[0];
       const out = w[0]; buyer.players[w[1]] = p; from.players[i] = out; [p.num, out.num] = [out.num, p.num]; moveP(p, from); moveP(out, buyer);
       logTransfer(p.name, from.name, buyer.name, fee, 'compra', p);
@@ -1654,6 +1657,7 @@ function processItem(it, ures) {
     }
     S.members = Math.max(500, Math.round(S.members * (1 + (phase() - .45) * .03)));
     tickBuild();
+    aiFinanceTick();
     if (windowOpen()) { aiTransfers(); euroOffer(); }
     refreshMarket();
     if (S.board.conf <= 0) S.fired = true;
@@ -1799,7 +1803,7 @@ function euroOffer() {
   if (Math.random() < .5) {
     const id = pick(S.divisions.A.filter(x => x !== 'user')), t = T(id);
     const p = t.players.slice(0, 11).filter(p => p.age <= 25 && pOvr(p) >= 72)[0];
-    if (p && Math.random() < .4) { const i = t.players.indexOf(p), np = makeProspect(DIVBASE.A + 6, 3); np.age = 19; np.num = p.num; np.pos = p.pos; t.players[i] = np; const ec = pick(EURO), fee = Math.round(value(p) * 1.5 / 10) * 10; logTransfer(p.name, t.name, ec, fee, 'exterior', p); news(`${ec} contrata ${p.name}, do ${t.name}, por ${brl(fee)}.`, 'Mercado', id); }
+    if (p && Math.random() < .4) { const i = t.players.indexOf(p), np = makeProspect(DIVBASE.A + 6, 3); np.age = 19; np.num = p.num; np.pos = p.pos; t.players[i] = np; const ec = pick(EURO), fee = Math.round(value(p) * 1.5 / 10) * 10; FIN(t).cash += fee; logTransfer(p.name, t.name, ec, fee, 'exterior', p); news(`${ec} contrata ${p.name}, do ${t.name}, por ${brl(fee)}.`, 'Mercado', id); }
   }
   if (Math.random() > .18 || S.euro.length) return;
   const u = T('user'), cands = u.players.filter(p => p.age <= 26 && pOvr(p) >= 70);
@@ -1814,35 +1818,119 @@ function euroOffer() {
   S.euro.push({ pid: p.id, club, offer });
   news(`${club} faz proposta de ${brl(offer)} por ${p.name}.`, 'Proposta');
 }
+/* =====================================================================
+   FINANÇAS DOS OUTROS CLUBES: caixa, folha, dívidas, salários atrasados e transfer ban
+   ===================================================================== */
+const DIVINC = { A: 1, B: .55, C: .3, D: .15 };
+const wageBill = t => t.players.reduce((a, p) => a + salary(p), 0);
+const hasFin = id => id !== 'user' && LG.includes(teamDiv(id));
+const wpick = (arr, w) => { let r = Math.random() * w.reduce((a, x) => a + x, 0); for (let i = 0; i < arr.length; i++) { r -= w[i]; if (r <= 0) return arr[i]; } return arr[arr.length - 1]; };
+function FIN(t) {
+  if (t.fin) return t.fin;
+  const d = teamDiv(t.id), w = Math.max(1, wageBill(t)), ids = (S.divisions[d] || []).filter(id => id !== 'user');
+  const better = ids.filter(id => ovr(T(id)) > ovr(t)).length, rank = ids.length > 1 ? better / (ids.length - 1) : .5;
+  const size = clamp(1 - rank, 0, 1);
+  return t.fin = { cash: Math.round(w * (3 + 24 * size * size + rnd(0, 5))), inc: Math.round(w * (1 + size * .06 + gauss() * .06 - .035)), risk: Math.random(), late: 0, ban: 0, div: d };
+}
+function finState(t) {
+  if (!hasFin(t.id)) return null;
+  const f = FIN(t), w = wageBill(t);
+  if (f.ban > 0) return ['ban', 'Transfer ban'];
+  if (f.late >= 2) return ['late', 'Salários atrasados'];
+  if (f.cash < 0) return ['crise', 'Em crise'];
+  if (f.cash > w * 18) return ['rico', 'Caixa forte'];
+  return null;
+}
+const finTag = t => { const st = finState(t); return st ? ` <span class="tag" style="${st[0] === 'rico' ? 'background:var(--good);color:#062414' : st[0] === 'crise' ? 'background:var(--amber);color:var(--amber-ink)' : 'background:var(--bad);color:#2a0606'}">${st[1]}</span>` : ''; };
+/* troca um titular fraco do comprador pelo reforço; o reserva vai para o clube vendedor */
+function aiSwap(buyer, bi, seller, p, fee, kind) {
+  const si = seller.players.indexOf(p), out = buyer.players[bi];
+  buyer.players[bi] = p; seller.players[si] = out; [p.num, out.num] = [out.num, p.num];
+  moveP(p, seller); moveP(out, buyer);
+  if (hasFin(buyer.id)) FIN(buyer).cash -= fee;
+  if (hasFin(seller.id)) FIN(seller).cash += fee;
+  logTransfer(p.name, seller.name, buyer.name, fee, kind || 'compra', p);
+  logTransfer(out.name, buyer.name, seller.name, 0, 'troca', out);
+}
+const weakStarter = t => t.players.slice(1, 11).map((q, k) => [q, k + 1]).sort((a, b) => pOvr(a[0]) - pOvr(b[0]))[0];
 function aiTransfers() {
-  const n = Math.random() < .6 ? (Math.random() < .35 ? 2 : 1) : 0;
+  const n = rint(2, 5);
   for (let k = 0; k < n; k++) aiOneTransfer();
-  if (Math.random() < .3) aiFreeSign();
+  if (Math.random() < .45) aiFreeSign();
 }
 /* clube contrata alguém que estava sem clube para o banco */
 function aiFreeSign() {
   if (!S.free.length) return;
-  const ids = LG.slice(1).flatMap(d => S.divisions[d] || []).filter(id => id !== 'user'); if (!ids.length) return;
+  const ids = LG.flatMap(d => S.divisions[d] || []).filter(id => hasFin(id) && !FIN(T(id)).ban); if (!ids.length) return;
   const t = T(pick(ids)), fa = S.free.slice().sort((a, b) => pOvr(b) - pOvr(a))[0];
   const w = t.players.map((q, k) => [q, k]).filter(([, k]) => k >= 11).sort((a, b) => pOvr(a[0]) - pOvr(b[0]))[0];
   if (!fa || !w || pOvr(fa) <= pOvr(w[0])) return;
   S.free.splice(S.free.indexOf(fa), 1); fa.num = w[0].num; fa.ct = 1; t.players[w[1]] = fa; S.free.push(w[0]); moveP(w[0], t); HI(fa).clubs.push('sem clube');
   logTransfer(fa.name, 'sem clube', t.name, 0, 'livre', fa);
 }
+/* quem tem dinheiro compra mais; quem arrisca compra sem ter e se endivida */
 function aiOneTransfer() {
-  const ladder = LG.filter(d => (S.divisions[d] || []).length);
-  const bd = pick(ladder.slice(0, Math.max(1, ladder.length - 1))), sd = Math.random() < .3 ? bd : ladder[Math.min(ladder.length - 1, ladder.indexOf(bd) + 1)];
-  const buyer = T(pick(S.divisions[bd].filter(id => id !== 'user')));
-  const sellerId = pick(S.divisions[sd].filter(id => id !== 'user' && id !== buyer.id)); if (!sellerId) return;
-  const seller = T(sellerId), idx = [...Array(10).keys()].map(i => i + 1);
-  const si = idx.sort((a, b) => pOvr(seller.players[b]) - pOvr(seller.players[a]))[0];
-  const bi = idx.slice().sort((a, b) => pOvr(buyer.players[a]) - pOvr(buyer.players[b]))[0];
-  const p = seller.players[si];
-  if (pOvr(p) <= pOvr(buyer.players[bi])) return;
-  [seller.players[si], buyer.players[bi]] = [buyer.players[bi], seller.players[si]];
-  moveP(p, seller); moveP(buyer.players[bi] === p ? seller.players[si] : buyer.players[bi], buyer);
-  logTransfer(p.name, seller.name, buyer.name, Math.round(value(p) * 1.2 / 10) * 10, 'compra', p);
-  if (teamDiv(buyer.id) === 'A' || Math.random() < .3) news(`${buyer.name} contrata ${p.name}, destaque do ${seller.name}.`, 'Mercado', buyer.id, `${pLine(p)}, ${teamDiv(sellerId) === teamDiv(buyer.id) ? `troca de clube dentro da ${DIVNAME[teamDiv(sellerId)]}` : `deixa a ${DIVNAME[teamDiv(sellerId)] || 'divisão de acesso'} para disputar a ${DIVNAME[teamDiv(buyer.id)]}`}. O valor da transferência gira em torno de ${brl(Math.round(value(p) * 1.2 / 10) * 10)}.`);
+  const pool = LG.flatMap(d => S.divisions[d] || []).filter(id => hasFin(id) && !FIN(T(id)).ban);
+  if (!pool.length) return;
+  const wts = pool.map(id => { const t = T(id), f = FIN(t); return Math.pow(Math.max(0, f.cash / Math.max(1, wageBill(t)) + (f.risk > .75 ? 9 : 0)), 1.3) + .05; });
+  const buyer = T(wpick(pool, wts)), bf = FIN(buyer), li = LG.indexOf(teamDiv(buyer.id)), w = wageBill(buyer);
+  const wk = weakStarter(buyer); if (!wk) return;
+  const sellers = LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user' && id !== buyer.id).filter(id => { const ld = LG.indexOf(teamDiv(id)); return ld > li || (ld === li && ovr(T(id)) <= ovr(buyer) + 1) || (hasFin(id) && FIN(T(id)).cash < 0); });
+  for (let tries = 0; tries < 5 && sellers.length; tries++) {
+    const seller = T(pick(sellers)), crisis = hasFin(seller.id) && FIN(seller).cash < 0;
+    const cand = seller.players.filter(q => pOvr(q) > pOvr(wk[0]) + 1 && q.pos !== 'GOL').sort((a, b) => (b.pos === wk[0].pos) - (a.pos === wk[0].pos) || pOvr(b) - pOvr(a));
+    const p = cand[0]; if (!p) continue;
+    const fee = Math.round(value(p) * (crisis ? rnd(.75, .95) : rnd(1.05, 1.4)) / 10) * 10;
+    if (bf.cash - fee < (bf.risk > .75 ? -9 * w : w * .5)) continue;
+    if (!crisis && seller.players.indexOf(p) < 11 && Math.random() < .35) continue;
+    aiSwap(buyer, wk[1], seller, p, fee);
+    const big = teamDiv(buyer.id) === 'A' || fee >= 5000;
+    if (big || Math.random() < .3) news(`${buyer.name} contrata ${p.name}, ${crisis ? 'que deixa o endividado' : 'destaque do'} ${seller.name}.`, 'Mercado', buyer.id,
+      `${pLine(p)}, ${teamDiv(seller.id) === teamDiv(buyer.id) ? `troca de clube dentro da ${DIVNAME[teamDiv(seller.id)]}` : `deixa a ${DIVNAME[teamDiv(seller.id)] || 'divisão de acesso'} para disputar a ${DIVNAME[teamDiv(buyer.id)]}`}. O negócio saiu por ${brl(fee)}${crisis ? ', abaixo do valor de mercado: o clube vendedor precisava de dinheiro para pagar salários' : ''}.${bf.cash < 0 ? ` A contratação deixa as contas do ${buyer.name} no vermelho.` : ''}`);
+    return;
+  }
+}
+/* clube em crise vende o melhor jogador para pagar as contas */
+function forcedSale(t) {
+  const f = FIN(t), p = t.players.slice(0, 11).filter(q => q.pos !== 'GOL').sort((a, b) => pOvr(b) - pOvr(a))[0]; if (!p) return;
+  const fee = Math.round(value(p) * rnd(.7, .9) / 10) * 10;
+  const buyers = LG.flatMap(d => S.divisions[d] || []).filter(id => hasFin(id) && id !== t.id && !FIN(T(id)).ban && FIN(T(id)).cash - fee > wageBill(T(id)));
+  if (buyers.length && (pOvr(p) < 76 || Math.random() < .6)) {
+    const b = T(wpick(buyers, buyers.map(id => Math.max(.1, FIN(T(id)).cash)))), wk = weakStarter(b);
+    if (wk && pOvr(p) > pOvr(wk[0])) { aiSwap(b, wk[1], t, p, fee); news(`Em crise, ${t.name} vende ${p.name} ao ${b.name} por ${brl(fee)}.`, 'Mercado', t.id, `Com dívidas e a folha salarial pesando, a diretoria do ${t.name} aceitou uma proposta abaixo do valor de mercado (${brl(value(p))}). O dinheiro vai para salários atrasados.`); return; }
+  }
+  const i = t.players.indexOf(p), np = makeProspect((DIVBASE[teamDiv(t.id)] || 60) + 4, 2), ec = pick(EURO);
+  np.age = rint(18, 20); np.num = p.num; np.pos = p.pos; t.players[i] = np; moveP(p, t); f.cash += fee;
+  logTransfer(p.name, t.name, ec, fee, 'exterior', p);
+  news(`Em crise, ${t.name} vende ${p.name} ao ${ec} por ${brl(fee)}.`, 'Mercado', t.id, `A venda ajuda a reduzir a dívida do clube. ${np.name}, da base, ganha a vaga no time.`);
+}
+/* jogador com salários atrasados entra na Justiça e sai de graça */
+function wageExit(t) {
+  const p = t.players.slice(0, 11).filter(q => q.pos !== 'GOL' && q.tr !== 'idolo').sort((a, b) => pOvr(b) - pOvr(a))[rint(0, 2)]; if (!p) return;
+  const i = t.players.indexOf(p), np = makeProspect((DIVBASE[teamDiv(t.id)] || 60) + 2, 2);
+  np.age = rint(18, 20); np.num = p.num; np.pos = p.pos; t.players[i] = np; S.free.push(p); moveP(p, t); p.ct = 1;
+  t.morale = clamp((t.morale ?? 60) - 8, 5, 100);
+  logTransfer(p.name, t.name, 'sem clube', 0, 'rescisão', p);
+  news(`${p.name} entra na Justiça e deixa o ${t.name} por salários atrasados.`, 'Mercado', t.id, `${pLine(p)}, estava há ${FIN(t).late} rodadas sem receber e conseguiu a rescisão do contrato. Agora está livre para assinar com qualquer clube. O elenco do ${t.name} perde força em meio à crise.`);
+}
+/* a cada rodada da liga: receita, folha, atrasos, punições e vendas forçadas */
+function aiFinanceTick() {
+  for (const d of LG) for (const id of S.divisions[d] || []) {
+    if (id === 'user') continue;
+    const t = T(id), f = FIN(t), w = Math.max(1, wageBill(t));
+    if (f.div !== d) { f.inc = Math.round(f.inc * Math.sqrt((DIVINC[d] || .2) / (DIVINC[f.div] || .2))); f.div = d; }
+    f.cash += f.inc - w;
+    if (f.cash < -w * 1.5) { f.late++; if (f.late === 2) news(`Crise no ${t.name}: jogadores estão com salários atrasados.`, 'Polêmica', id, `O clube acumula dívida de ${brl(-f.cash)} e não consegue pagar a folha de ${brl(w)} por rodada. O elenco ameaça ir à Justiça.`); }
+    else f.late = Math.max(0, f.late - (f.cash > 0 ? 2 : 1));
+    if (f.ban > 0) {
+      if (--f.ban === 0) { if (f.cash < -w * 3) { f.ban = 6; news(`Transfer ban do ${t.name} é prorrogado: a dívida continua.`, 'Mercado', id); } else news(`${t.name} quita as dívidas e se livra do transfer ban.`, 'Mercado', id); }
+    } else if (f.cash < -w * 5 && f.late >= 2) {
+      f.ban = rint(12, 20);
+      news(`FIFA aplica transfer ban ao ${t.name}.`, 'Mercado', id, `O clube não pagou parcelas de contratações e está proibido de registrar reforços por ${f.ban} rodadas, inclusive jogadores sem clube. A dívida estimada passa de ${brl(-f.cash)}.`);
+    }
+    if (f.late >= 3 && Math.random() < .22) wageExit(t);
+    if (f.cash < 0 && windowOpen() && Math.random() < .3) forcedSale(t);
+  }
 }
 function refreshMarket() {
   const pool = LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user');
@@ -2513,7 +2601,7 @@ const MAX_SQ = 25, MIN_SQ = 16;
 let mf = { q: '', pos: '', age: '', price: '', div: '', ct: '', sort: 'ovr', lim: 30 };
 function askPrice(p, t, idx) {
   const df = { A: 1.2, B: 1, C: .85, D: .7, X: 1.3 }[teamDiv(t.id)] || 1;
-  return Math.round(value(p) * (idx < 11 ? 1.35 : 1.05) * df * (p.ct <= 1 ? .6 : 1) * (S.ask[p.id] || 1) / 10) * 10;
+  return Math.round(value(p) * (idx < 11 ? 1.35 : 1.05) * df * (p.ct <= 1 ? .6 : 1) * (hasFin(t.id) && FIN(t).cash < 0 ? .85 : 1) * (S.ask[p.id] || 1) / 10) * 10;
 }
 function nextNum(t) { const used = new Set(t.players.map(p => p.num)); for (let n = 1; n < 100; n++) if (!used.has(n)) return n; return 99; }
 function logTransfer(name, from, to, fee, kind, p) {
@@ -2535,7 +2623,7 @@ function doBuy(t, p, fee, swapIdx, loan) {
   let old = null;
   if (swapIdx != null) { old = u.players[swapIdx]; [old.num, p.num] = [p.num, old.num]; u.players[swapIdx] = p; t.players[j] = old; moveP(old, u); logTransfer(old.name, u.name, t.name, 0, 'troca', old); }
   else { t.players.splice(j, 1); if (u.players.some(q => q.num === p.num)) p.num = nextNum(u); u.players.push(p); fillSquad(t); }
-  moveP(p, t); addMoney(-fee, loan ? 'Empréstimos' : 'Contratações');
+  moveP(p, t); addMoney(-fee, loan ? 'Empréstimos' : 'Contratações'); if (hasFin(t.id)) FIN(t).cash += fee;
   if (loan) S.loansIn.push({ tid: t.id, pid: p.id, back: old ? old.id : null });
   logTransfer(p.name, t.name, u.name, fee, loan ? 'empréstimo' : 'compra', p);
   news(loan ? `${u.name} acerta o empréstimo de ${p.name}, do ${t.name}, até o fim da temporada.` : `${u.name} contrata ${p.name}, do ${t.name}, por ${brl(fee)}${old ? ` mais ${old.name}` : ''}.`, 'Mercado');
@@ -2548,14 +2636,14 @@ function sellUser(p, tid, amount) {
   const worst = t.players.map((q, k) => [q, k]).filter(([, k]) => k >= 11).sort((a, b) => pOvr(a[0]) - pOvr(b[0]))[0];
   if (worst && t.players.length >= 16) { S.free.push(worst[0]); moveP(worst[0], t); t.players[worst[1]] = p; } else t.players.push(p);
   if (t.players.some(q => q !== p && q.num === p.num)) p.num = nextNum(t);
-  p.sale = false; moveP(p, u); addMoney(amount, 'Vendas'); logTransfer(p.name, u.name, t.name, amount, 'venda', p);
+  p.sale = false; moveP(p, u); addMoney(amount, 'Vendas'); if (hasFin(t.id)) FIN(t).cash -= amount; logTransfer(p.name, u.name, t.name, amount, 'venda', p);
   news(`${u.name} vende ${p.name} ao ${t.name} por ${brl(amount)}.`, 'Mercado');
 }
 function genBids() {
   const u = T('user'); if (S.bids.length >= 4) return;
   for (const p of u.players) {
     if (!(p.sale ? Math.random() < .45 : pOvr(p) >= 75 && Math.random() < .05) || S.bids.some(b => b.pid === p.id)) continue;
-    const pool = LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user' && Math.abs(ovr(T(id)) - pOvr(p)) < 12);
+    const pool = LG.flatMap(d => S.divisions[d] || []).filter(id => id !== 'user' && Math.abs(ovr(T(id)) - pOvr(p)) < 12 && (!hasFin(id) || (!FIN(T(id)).ban && FIN(T(id)).cash > value(p) * .9)));
     if (!pool.length) continue;
     const tid = pick(pool), amount = Math.round(value(p) * (p.sale ? rnd(.85, 1.15) : rnd(1.05, 1.3)) / 10) * 10;
     S.bids.push({ pid: p.id, tid, amount, counter: false });
@@ -2567,7 +2655,7 @@ const loanPrice = p => Math.round(value(p) * .15 / 10) * 10;
 let mkClub = null, mkDiv = 'A', mkHist = 'all';
 const teamByName = n => Object.values(S.teams).find(t => t.name === n);
 const normTxt = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const KIND = { compra: 'Compra', venda: 'Venda', troca: 'Troca', 'empréstimo': 'Empréstimo', livre: 'Sem custo', astro: 'Astro', exterior: 'Exterior' };
+const KIND = { 'rescisão': 'Rescisão', compra: 'Compra', venda: 'Venda', troca: 'Troca', 'empréstimo': 'Empréstimo', livre: 'Sem custo', astro: 'Astro', exterior: 'Exterior' };
 function marketView() {
   const k = sub.mk || 'central', nw = (S.watch || []).length;
   return seg('sub-mk', k, [['central', 'Painel'], ['busca', 'Buscar'], ['clubes', 'Clubes'], ['obs', `Observados${nw ? ` (${nw})` : ''}`], ['props', `Vendas${S.bids.length ? ` (${S.bids.length})` : ''}`], ['astros', 'Astros'], ['livres', 'Sem clube'], ['hist', 'Histórico']]).replace('class="seg"', 'class="seg wrap" style="grid-template-columns:repeat(4,1fr)"')
@@ -2602,6 +2690,8 @@ function centralView() {
     ${S.transfers.slice(0, 8).map(trRow).join('') || '<div class="muted">Nenhuma transferência ainda. Quando a janela abrir, os clubes vão às compras.</div>'}</div>
   ${top.length ? `<div class="card"><span class="label">Maiores negócios da temporada</span>${top.map((x, i) => `<div class="kv"><span><b>${i + 1}. ${esc(x.name)}</b><br><span class="muted" style="font-size:12px">${esc(x.from)} → ${esc(x.to)}</span></span><b>${brl(x.fee)}</b></div>`).join('')}</div>` : ''}
   ${busiest.length ? `<div class="card"><span class="label">Clubes mais ativos</span>${busiest.map(([n, c]) => { const t = teamByName(n); return `<button class="prow" data-act="mkclub" data-v="${t.id}">${crest(t, 28)}<span><span class="nm">${esc(n)}</span><br><span class="meta">${c} reforço${c > 1 ? 's' : ''} na temporada</span></span><span class="ov">›</span></button>`; }).join('')}</div>` : ''}
+  ${(() => { const cr = LG.flatMap(d => S.divisions[d] || []).filter(id => hasFin(id) && (FIN(T(id)).ban || FIN(T(id)).late >= 2 || FIN(T(id)).cash < 0)).sort((a, b) => FIN(T(a)).cash - FIN(T(b)).cash).slice(0, 6);
+    return cr.length ? `<div class="card"><span class="label">Crises e punições</span><div class="muted" style="font-size:13px">Clubes endividados vendem mais barato. Com salários atrasados, jogadores vão à Justiça; com transfer ban, o clube não pode contratar.</div>${cr.map(id => { const t = T(id), f = FIN(t); return `<button class="prow" data-act="mkclub" data-v="${id}">${crest(t, 28)}<span style="min-width:0"><span class="nm">${esc(t.name)}${finTag(t)}</span><br><span class="meta">dívida ${brl(Math.max(0, -Math.round(f.cash / 10) * 10))}${f.ban ? ` · ban por ${f.ban} rodadas` : ''}</span></span><span class="ov">›</span></button>`; }).join('')}</div>` : ''; })()}
   <div class="card"><span class="label">Rumores do mercado</span>${rum || '<div class="muted">Sem rumores no momento.</div>'}</div>
   ${opp.length ? `<div class="card"><span class="label">Fim de contrato</span><div class="muted" style="font-size:13px">Jogadores no último ano de contrato saem mais baratos.</div>
     ${opp.map(({ t, p, idx }) => `<button class="prow" data-act="mkclub" data-v="${t.id}">${pnum(t, p, idx)}<span style="min-width:0"><span class="nm">${esc(p.name)}</span><br><span class="meta"><span class="pos-tag">${p.pos}</span> ${esc(t.name)} · ${p.age} anos · ${brl(askPrice(p, t, idx))}</span></span><span class="ov">${pOvr(p)}</span></button>`).join('')}
@@ -2681,7 +2771,7 @@ function clubsMkView() {
   const ids = mkDiv === 'X' ? [...new Set(S.foreign.lib.concat(S.foreign.sul))].filter(id => S.teams[id]) : (S.divisions[mkDiv] || []);
   const cur = S.transfers.filter(x => x.s === S.season);
   return mkHeader() + seg('mkdiv', mkDiv, divs) + `<div class="card"><div class="list">${ids.slice().sort((a, b) => ovr(T(b)) - ovr(T(a))).map(id => { const t = T(id), inn = cur.filter(x => x.to === t.name).length, out = cur.filter(x => x.from === t.name).length;
-    return `<button class="prow" data-act="mkclub" data-v="${id}">${crest(t, 28)}<span style="min-width:0"><span class="nm">${esc(t.name)}${id === 'user' ? ' <span class="tag gold">Você</span>' : ''}</span><br><span class="meta">força ${ovr(t)} · ${inn} chegada${inn === 1 ? '' : 's'} · ${out} saída${out === 1 ? '' : 's'}</span></span><span class="ov">›</span></button>`; }).join('')}</div></div>`;
+    return `<button class="prow" data-act="mkclub" data-v="${id}">${crest(t, 28)}<span style="min-width:0"><span class="nm">${esc(t.name)}${id === 'user' ? ' <span class="tag gold">Você</span>' : finTag(t)}</span><br><span class="meta">força ${ovr(t)} · ${inn} chegada${inn === 1 ? '' : 's'} · ${out} saída${out === 1 ? '' : 's'}</span></span><span class="ov">›</span></button>`; }).join('')}</div></div>`;
 }
 function clubMkPage(t) {
   const isU = t.id === 'user', moves = S.transfers.filter(x => x.to === t.name || x.from === t.name);
@@ -2693,6 +2783,14 @@ function clubMkPage(t) {
   return `<div class="card"><button class="linkbtn" data-act="mkclub" data-v="">‹ Voltar aos clubes</button>
     <div class="row">${crest(t, 48)}<div style="min-width:0"><span class="label">${d === 'X' ? 'Exterior' : DIVNAME[d]}${tp ? ` · ${tp.pos}º lugar` : ''}</span><h2>${esc(t.name)}</h2><div class="muted">Força ${ovr(t)} · elenco de ${t.players.length}${weak && !isU ? ` · ponto fraco: ${POSN[weak[0]] || weak[0]}` : ''}</div></div></div>
     <div class="stat-grid"><div><span class="muted">Chegadas</span><b>${inn.filter(x => x.s === S.season).length}</b></div><div><span class="muted">Saídas</span><b>${out.filter(x => x.s === S.season).length}</b></div><div><span class="muted">Gasto</span><b>${brl(spent)}</b></div><div><span class="muted">Recebido</span><b>${brl(got)}</b></div></div></div>
+  ${hasFin(t.id) ? (() => { const f = FIN(t), w = wageBill(t), st = finState(t);
+    return `<div class="card"><span class="label">Finanças${finTag(t)}</span>
+      <div class="kv"><span class="muted">Caixa estimado</span><b class="${f.cash < 0 ? 'neg' : 'pos'}">${brl(Math.round(f.cash / 10) * 10)}</b></div>
+      <div class="kv"><span class="muted">Folha salarial</span><span>${brl(w)}/rodada</span></div>
+      <div class="kv"><span class="muted">Receitas</span><span>${brl(f.inc)}/rodada</span></div>
+      ${f.ban ? `<div class="kv"><span class="muted">Transfer ban</span><b style="color:var(--bad)">mais ${f.ban} rodada${f.ban === 1 ? '' : 's'}</b></div>` : ''}
+      ${f.late ? `<div class="kv"><span class="muted">Salários atrasados</span><span>${f.late} rodada${f.late === 1 ? '' : 's'}</span></div>` : ''}
+      <div class="muted" style="font-size:12px">${f.ban ? 'Proibido de contratar, inclusive jogadores sem clube. Precisa vender para quitar a dívida.' : st && st[0] === 'late' ? 'Jogadores podem ir à Justiça e sair de graça. Bom momento para comprar barato.' : f.cash < 0 ? 'Clube endividado: vende mais barato e aceita propostas com mais facilidade.' : f.cash > w * 18 ? 'Clube com dinheiro para contratar.' : f.inc < w ? 'Gasta mais do que arrecada: pode entrar em crise.' : 'Contas equilibradas.'}</div></div>`; })() : ''}
   <div class="card"><span class="label">Contratações</span>${inn.slice(0, 8).map(trRow).join('') || '<div class="muted">Nenhuma contratação registrada.</div>'}</div>
   <div class="card"><span class="label">Saídas</span>${out.slice(0, 8).map(trRow).join('') || '<div class="muted">Nenhuma saída registrada.</div>'}</div>
   ${isU ? '' : `<div class="card"><span class="label">Elenco · toque para negociar</span><div class="list">${t.players.map((p, idx) => playerRow(t, p, idx, askPrice(p, t, idx))).join('')}</div></div>`}`;
@@ -2914,7 +3012,7 @@ document.addEventListener('click', e => {
     if (!willing(p, t)) { S.ask[p.id] = (S.ask[p.id] || 1) * 1.05; return msg(false, `${p.name} não quer jogar na ${DIVNAME[userDiv()]}.`); }
     if (loan) { if (idx < 11 && Math.random() < .5) return msg(false, `O ${t.name} não empresta um titular.`); doBuy(t, p, fee, null, true); return msg(true, `Empréstimo de ${p.name} fechado!`); }
     const swapVal = swapIdx != null ? value(u.players[swapIdx]) * .8 : 0;
-    const pa = clamp(((fee + swapVal) / ask - .82) * 3.5, 0, .97) * (idx < 11 ? .85 : 1);
+    const pa = clamp(((fee + swapVal) / ask - .82) * 3.5 + (hasFin(t.id) && FIN(t).cash < 0 ? .15 : 0), 0, .97) * (idx < 11 ? .85 : 1);
     if (Math.random() < pa) { doBuy(t, p, fee, swapIdx, false); return msg(true, `Negócio fechado: ${p.name} é do ${u.name}!`); }
     if (Math.random() < .5) { S.counter = { tid: t.id, pid: p.id, price: Math.round(ask * rnd(1, 1.12) / 10) * 10, swapIdx }; return msg(false, `O ${t.name} recusou, mas fez uma contraproposta.`); }
     S.ask[p.id] = (S.ask[p.id] || 1) * 1.05; return msg(false, `O ${t.name} recusou a proposta por ${p.name} e subiu a pedida.`);
