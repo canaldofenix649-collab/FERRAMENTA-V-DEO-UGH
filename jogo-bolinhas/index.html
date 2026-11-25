@@ -718,6 +718,29 @@ function autoSubs(m, s, n) {
     substitute(m, out, inP);
   }
 }
+/* auxiliar técnico no comando: troca cansados, pendurados e mexe no time conforme o placar */
+function assistTick(m, s) {
+  const sd = m.side[s], lvl = m.assistLvl || 2; if (sd.subs >= 5 || !sd.bench.length) return;
+  const f = formOf(sd.team), mine = m.bodies.filter(b => b.side === s), diff = m.score[s] - m.score[1 - s], late = m.t >= 2600;
+  const fit = (p, want) => pOvr(p) * posFit(p.pos, want);
+  const bestFor = (want, pref) => sd.bench.filter(p => p.pos !== 'GOL' && avail(p) && (!pref || pref.includes(p.pos))).sort((a, b) => fit(b, want) - fit(a, want))[0];
+  // 1) mudança tática pelo placar (auxiliar nível 2+)
+  if (lvl >= 2 && late && !sd.aTac) {
+    if (diff < 0) {
+      const out = mine.filter(b => !b.gk && ['VOL', 'ZAG', 'LAT'].includes(b.p.pos)).sort((a, b) => pOvr(a.p) - pOvr(b.p))[0], inP = bestFor(slotPos(f, out ? out.idx : 10), ['CA', 'PON', 'MEI']);
+      if (out && inP && substitute(m, out, inP)) { sd.aTac = 1; m.tactic[s] = 1; say(m, `${sd.team.abbr}: o auxiliar adianta o time em busca do gol.`, 'sub'); return; }
+    } else if (diff === 1 && m.t >= 3100 && lvl >= 3) {
+      const out = mine.filter(b => !b.gk && ['CA', 'PON'].includes(b.p.pos)).sort((a, b) => a.sta - b.sta)[0], inP = bestFor(slotPos(f, out ? out.idx : 10), ['VOL', 'ZAG', 'LAT']);
+      if (out && inP && substitute(m, out, inP)) { sd.aTac = 1; m.tactic[s] = -1; say(m, `${sd.team.abbr}: o auxiliar fecha a casinha para segurar a vitória.`, 'sub'); return; }
+    }
+  }
+  // 2) pendurado com amarelo no segundo tempo (nível 3+)
+  if (lvl >= 3 && m.t >= 2200) { const out = mine.find(b => !b.gk && b.yc && !b.aSafe); if (out) { out.aSafe = true; const inP = bestFor(slotPos(f, out.idx)); if (inP && fit(inP, slotPos(f, out.idx)) > pOvr(out.p) * .82 && substitute(m, out, inP)) return; } }
+  // 3) cansaço: quanto melhor o auxiliar, mais cedo ele percebe
+  const left = Math.min(5, sd.subs + sd.bench.filter(p => p.pos !== 'GOL').length) - sd.subs, keep = lvl >= 2 && !sd.aTac && m.t < 3000 && left <= 1;
+  const thr = 50 + lvl * 3.5, out = mine.filter(b => !b.gk && b.sta < (keep ? 38 : thr)).sort((a, b) => a.sta - b.sta)[0];
+  if (out) { const want = slotPos(f, out.idx), inP = bestFor(want); if (inP && (fit(inP, want) >= pOvr(out.p) * (.72 + out.sta / 400) || out.sta < 40)) substitute(m, out, inP); }
+}
 function goal(m, s) {
   m.score[s]++;
   const lt = m.lastTouch, min = Math.min(90, Math.floor(m.t / 40) + 1);
@@ -745,7 +768,8 @@ function step(m) {
     const diff = m.score[s] - m.score[1 - s], min = m.t / 40;
     m.tactic[s] = diff < 0 && min > 55 ? 1 : diff > 0 && min > 70 ? -1 : 0;
   }
-  if (m.t === 2400 || m.t === 3000) for (const s of [0, 1]) if (m.ai.includes(s) || m.autoSub[s]) autoSubs(m, s, m.t === 2400 ? 2 : 2);
+  if (m.t === 2400 || m.t === 3000) for (const s of [0, 1]) if ((m.ai.includes(s) || m.autoSub[s]) && !(m.assist && m.assist[s])) autoSubs(m, s, m.t === 2400 ? 2 : 2);
+  if (m.assist && m.t >= 1700 && m.t % 100 === 0) for (const s of [0, 1]) if (m.assist[s]) assistTick(m, s);
   if (m.freeze > 0) {
     m.freeze--;
     if (m.sp) drift(m);
@@ -1092,7 +1116,7 @@ const nameKind = name => /Real Madrid|Manchester|^Al /.test(name) ? 'intl' : 'es
 const YNAMES = ['Kauã','Davi','Enzo','Pietro','Ryan','Luan','Kayky','Wesley','Caio','Juninho','Pedrinho','Arthurzinho','Miguel','Heitor','Bernardo','Samuel','Lorenzo','Benício','Nicolas','Joaquim','Vitinho','Gui','Dudu','Rafinha'];
 const YSUR = ['Silva','Santos','Souza','Oliveira','Lima','Costa','Pereira','Rocha','Alves','Ribeiro','Carvalho','Gomes','Martins','Araújo','Barbosa','Moura'];
 const STAFF_N = ['Marcos Ribeiro','Paulo Henrique Lopes','Carla Mendes','Rogério Vasconcelos','Fábio Dantas','Renata Prado','Anderson Teles','Luciana Paiva','Cláudio Nogueira','Sérgio Amaral','Juliana Bastos','Tiago Fontes','Ricardo Leme','Patrícia Moura','Gustavo Arantes','Beatriz Salles'];
-const STAFF = { fis: ['Preparador físico', 'Menos cansaço, menos lesões e um time mais rápido.'], med: ['Médico', 'Lesões curam mais rápido.'], aux: ['Auxiliar técnico', 'Mais entrosamento e moral mais estável.'], olh: ['Olheiro', 'Promessas da base com mais potencial.'] };
+const STAFF = { fis: ['Preparador físico', 'Menos cansaço, menos lesões e um time mais rápido.'], med: ['Médico', 'Lesões curam mais rápido.'], aux: ['Auxiliar técnico', 'Mais entrosamento e moral mais estável. Com o auxiliar ligado na preleção, faz substituições mais cedo e mais inteligentes.'], olh: ['Olheiro', 'Promessas da base com mais potencial.'] };
 const SPONSORS = ['Banco Redondo','Refrigerante Quique','Seguros Gol de Placa','Supermercado Bola Cheia','TeleChute','Construtora Trave','Energia Escanteio','Motos Tabelinha','Farmácia Pênalti','Açaí Artilheiro','Pneus Rolê','Café Prorrogação','Internet Lançamento','Calçados Drible','Biscoitos Chapéu','Água Gandula','Tintas Meia-Lua','Rádio Bandeirinha'];
 const DIVS = ['A', 'B', 'C'];          // séries com clubes reais na criação
 const LG = ['A', 'B', 'C', 'D'];        // todas as divisões jogadas
@@ -2498,6 +2522,18 @@ function matchInfo(ev) {
 let pmSel = null, preMode = false, crestMsg = '';
 const TAC_DEF = { ment: 0, press: 'normal', style: 'equil', pk: null, fk: null, ck: null, cap: null, kit: null };
 const tacOf = () => { const u = T('user'); u.tac = Object.assign({}, TAC_DEF, u.tac || {}); return u.tac; };
+function xiScore(f) {
+  const pool = T('user').players.filter(avail); let sc = 0;
+  for (let i = 0; i < 11; i++) { const want = slotPos(f, i), best = pool.slice().sort((a, b) => pOvr(b) * posFit(b.pos, want) - pOvr(a) * posFit(a.pos, want))[0]; if (!best) break; sc += pOvr(best) * posFit(best.pos, want); pool.splice(pool.indexOf(best), 1); }
+  return sc;
+}
+const assistMode = () => (S && S.assist) || 'off';
+/* o auxiliar escolhe a formação que melhor encaixa os jogadores disponíveis e escala os titulares */
+function assistLineup() {
+  const u = T('user'); let bf = formOf(u), bs = xiScore(bf) * 1.01;
+  for (const f of Object.keys(FORM)) { const sc = xiScore(f); if (sc > bs) { bs = sc; bf = f; } }
+  u.formation = bf; autoXI();
+}
 function autoXI() {
   const u = T('user'), f = formOf(u), pool = u.players.slice(), xi = [];
   const order = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -2534,6 +2570,9 @@ function preView() {
   const outs = u.players.slice(0, 11).filter(p => !avail(p));
   return `<div class="card"><div class="round-h"><span class="label">Preleção · ${esc(itemLabel(ev.it))}</span><button class="btn small" data-act="pmback">Voltar</button></div>
     <div class="vs">${[T(ev.home), T(ev.away)].map(t => `<div class="side ${t.id === 'user' ? 'you' : ''}">${badge(t, 'lg')}<span class="name">${esc(t.name)}</span><span class="ovr">Força ${ovr(t)}</span></div>`).join('<div class="mid">×</div>')}</div></div>
+  <div class="card"><span class="label">Auxiliar técnico · nível ${u.staff.aux || 2}</span>
+    <div class="seg">${[['off', 'Desligado'], ['subs', 'Substituições'], ['full', 'Escala e substitui']].map(([v, l]) => `<button data-act="assist" data-v="${v}" aria-pressed="${assistMode() === v}">${l}</button>`).join('')}</div>
+    <span class="muted" style="font-size:12px">${assistMode() === 'off' ? 'Você faz tudo. Ligue o auxiliar para ele trocar os jogadores cansados durante o jogo.' : assistMode() === 'subs' ? 'Durante o jogo, o auxiliar troca quem cansou' + ((u.staff.aux || 2) >= 2 ? ', adianta o time quando estiver perdendo' : '') + ((u.staff.aux || 2) >= 3 ? ', segura o resultado e tira quem está pendurado com amarelo' : '') + '. Você escala.' : 'Antes de cada jogo, o auxiliar escolhe a formação que melhor encaixa o elenco disponível e escala os titulares. Durante o jogo, faz as substituições.'} Um auxiliar melhor (Clube › Comissão) percebe o cansaço mais cedo e toma mais decisões táticas.</span></div>
   <div class="card"><span class="label">Formação</span>${formPicker(u.formation)}
     <div class="btns"><button class="btn small" data-act="autoxi">Escalação automática</button><span class="muted" style="font-size:12px;align-self:center">Toque em um jogador e depois em outro para trocar.</span></div></div>
   <div class="card"><span class="label">Titulares</span><div class="pm-pitch">${u.players.slice(0, 11).map(chip).join('')}</div>
@@ -3437,7 +3476,8 @@ document.addEventListener('click', e => {
   }
   else if (a === 'loan') { if (S.loan) return; const amt = +v; addMoney(amt, 'Empréstimo bancário'); S.loan = { left: 20, pay: Math.round(amt * 1.3 / 20) }; news(`O clube pega ${brl(amt)} emprestados no banco.`, 'Finanças'); save(); render(true); }
   else if (a === 'iv') { interview(+v); }
-  else if (a === 'play') { preMode = true; pmSel = null; tab = 'home'; render(); }
+  else if (a === 'play') { preMode = true; pmSel = null; tab = 'home'; if (assistMode() === 'full') { assistLineup(); save(); } render(); }
+  else if (a === 'assist') { S.assist = v; if (v === 'full') assistLineup(); save(); render(true); }
   else if (a === 'pmback') { preMode = false; pmSel = null; render(); }
   else if (a === 'pmplay') { preMode = false; pmSel = null; save(); openMatch(); }
   else if (a === 'pmquick') { preMode = false; pmSel = null; save(); quickMatch(); }
@@ -3668,8 +3708,10 @@ function finishUserMatch(ev, m, userSide) {
 }
 function quickMatch() {
   const ev = nextEvent();
+  if (assistMode() === 'full') assistLineup();
   const m = createMatch(T('user'), T(ev.opp), { ai: [0, 1], comp: compKey(ev.it), home: ev.neutral ? null : ev.home === 'user' ? 0 : 1, weather: ev.weather });
   m.tactic[0] = (T('user').tac && T('user').tac.ment) || 0;
+  if (assistMode() !== 'off') { m.assist = [true, false]; m.assistLvl = T('user').staff.aux || 2; }
   while (!m.over) step(m);
   finishUserMatch(ev, m, 0);
   render();
@@ -3722,10 +3764,12 @@ const cv = $('pitch'), ctx = cv.getContext('2d');
 let LS = 0, M = null, EV = null, US = 0, speed = 1, pauseF = 0, flash = null, raf = 0, scale = 1, replay = null, subSel = null, rain = [];
 function openMatch() {
   EV = nextEvent();
+  if (assistMode() === 'full') assistLineup();
   const me = T('user'), op = T(EV.opp);
   US = 0;
   M = createMatch(me, op, { ai: [1], comp: compKey(EV.it), home: EV.neutral ? null : EV.home === 'user' ? 0 : 1, weather: EV.weather, rec: true });
   M.autoSub[0] = false; M.tactic[0] = (me.tac && me.tac.ment) || 0;
+  M.assist = [assistMode() !== 'off', false]; M.assistLvl = me.staff.aux || 2;
   M.onGoal = (ev, rec) => { pauseF = 55; flash = { text: 'GOL!', sub: ev.own ? `contra · ${ev.name}` : `${ev.name} ${ev.celeb || ''}`, side: ev.side, t: 70 }; if (!ev.own) $('feed').textContent = `${ev.min}' GOL! ${ev.name} ${ev.celeb || ''}`; roar(); whistle('short'); if (ev.side === 0) { try { navigator.vibrate && navigator.vibrate([180, 80, 180]); } catch (e) {} } if (rec && rec.length > 20 && speed === 1) replay = { frames: rec, i: 0 }; updateBoard(); };
   M.onHalf = () => { pauseF = 50; flash = { text: 'INTERVALO', sub: '', side: -1, t: 50 }; whistle('long'); };
   M.onLog = l => { if (l.kind !== 'goal') $('feed').textContent = `${l.min}' ${l.text}`; };
