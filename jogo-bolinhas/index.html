@@ -2356,8 +2356,8 @@ function tableView() {
   const d = viewDiv || userDiv(), tbl = standings(d), n = tbl.length;
   const cg = d === 'C' ? cGroupTables() : null;
   return `${editId ? editCard() : ''}
-  <div class="card"><div class="round-h"><span class="label">Escudos</span><label class="btn small file-btn">Importar escudos<input type="file" accept="image/*" multiple id="crests-in"></label></div>
-    <span class="muted" style="font-size:12px">Escolha várias imagens de uma vez com o nome do clube no arquivo (ex.: flamengo.png, sao paulo.png ou FLA.png). Ficam salvas só neste aparelho.${crestMsg ? ` <b style="color:var(--amber)">${esc(crestMsg)}</b>` : ''}</span>
+  <div class="card"><div class="round-h"><span class="label">Escudos</span><div class="btns" style="margin:0"><label class="btn small file-btn">Importar escudos<input type="file" accept="image/*" multiple id="crests-in"></label><label class="btn small file-btn">Fotos de estádios<input type="file" accept="image/*" multiple id="stads-in"></label></div></div>
+    <span class="muted" style="font-size:12px">Escolha várias imagens de uma vez com o nome do clube no arquivo (ex.: flamengo.png, sao paulo.jpg ou FLA.png). Vale para escudos e para fotos de estádios. Ficam salvas só neste aparelho.${crestMsg ? ` <b style="color:var(--amber)">${esc(crestMsg)}</b>` : ''}</span>
     ${Object.values(S.teams).some(t => t.logo) ? '<button class="btn small" data-act="nologos">Remover todos os escudos importados</button>' : ''}</div>
   ${seg('div', d, LG.filter(x => (S.divisions[x] || []).length).map(x => [x, DIVNAME[x]]))}
   ${cg ? `<div class="card"><span class="label">Quadrangulares finais · 2 primeiros de cada grupo sobem</span><div class="grp">${cg.map((g, i) => miniTable(g, 2, `Grupo ${i + 1}`)).join('')}</div>${(S.results.C[25] || []).length ? `<div class="results">${S.results.C.slice(25, 27).filter(Boolean).flat().map(resultRow).join('')}</div>` : ''}</div>` : ''}
@@ -3017,6 +3017,16 @@ document.addEventListener('change', e => {
       const fr = new FileReader(); fr.onload = () => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d'), sc = Math.min(96 / img.width, 96 / img.height); x.drawImage(img, (96 - img.width * sc) / 2, (96 - img.height * sc) / 2, img.width * sc, img.height * sc); tm.logo = c.toDataURL('image/png'); ok++;
         if (--left === 0) { crestMsg = `${ok} escudo${ok === 1 ? '' : 's'} importado${ok === 1 ? '' : 's'}${miss.length ? `; sem clube para: ${miss.slice(0, 5).join(', ')}` : ''}.`; save(); render(true); } };
         img.onerror = () => { miss.push(f.name); if (--left === 0) { crestMsg = `${ok} escudos importados.`; save(); render(true); } }; img.src = fr.result; }; fr.readAsDataURL(f); });
+    return;
+  }
+  if (t.id === 'stads-in' && t.files && t.files.length) {
+    const norm = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\.[a-z0-9]+$/, '').replace(/[^a-z0-9]/g, '');
+    const teams = Object.values(S.teams).filter(x => x.id[0] !== 'm'), files = [...t.files]; let ok = 0, left = files.length; const miss = [];
+    const findT = f => { const k = norm(f.name); return teams.find(x => norm(x.name) === k) || teams.find(x => x.abbr.toLowerCase() === k) || (k.length >= 4 && teams.find(x => norm(x.name).startsWith(k))); };
+    const done = () => { if (--left > 0) return; save(); let full = false; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (err) { full = true; }
+      crestMsg = full ? 'A memória do aparelho encheu: nem todas as fotos ficaram salvas. Remova algumas fotos e tente de novo.' : `${ok} foto${ok === 1 ? '' : 's'} de estádio importada${ok === 1 ? '' : 's'}${miss.length ? `; sem clube para: ${miss.slice(0, 5).join(', ')}` : ''}.`; render(true); };
+    files.forEach(f => { const tm = findT(f); if (!tm) { miss.push(f.name); done(); return; }
+      const fr = new FileReader(); fr.onload = () => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'), w = 512, h = 288; c.width = w; c.height = h; const x = c.getContext('2d'), sc = Math.max(w / img.width, h / img.height); x.drawImage(img, (w - img.width * sc) / 2, (h - img.height * sc) / 2, img.width * sc, img.height * sc); tm.stadium.photo = c.toDataURL('image/jpeg', .55); ok++; done(); }; img.onerror = () => { miss.push(f.name); done(); }; img.src = fr.result; }; fr.readAsDataURL(f); });
     return;
   }
   if (t.classList && t.classList.contains('stad-in') && t.files && t.files[0]) {
