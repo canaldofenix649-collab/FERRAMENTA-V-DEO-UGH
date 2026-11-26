@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Liga das Bolinhas",
+  "short_name": "Bolinhas",
+  "description": "Futebol de bolinhas com carreira: Séries A, B e C, copas, mercado e estádio.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c1d22",
+  "theme_color": "#0c1d22",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
