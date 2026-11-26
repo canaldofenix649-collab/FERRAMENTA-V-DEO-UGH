@@ -325,6 +325,28 @@ nav.tabs button[aria-current="true"] svg { filter: drop-shadow(0 0 6px rgba(255,
 .choice { display: flex; flex-direction: column; gap: 8px; }
 .choice .btn { text-align: left; font-weight: 500; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+/* Computador: menu lateral, conteúdo em colunas */
+@media (min-width: 960px) {
+  .app { max-width: 1480px; display: grid; grid-template-columns: 232px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .app > .top { grid-column: 1 / -1; padding: 14px 28px; }
+  .brand { font-size: 20px; }
+  .brand small { font-size: 12px; }
+  nav.tabs { grid-row: 2; grid-column: 1; display: flex; flex-direction: column; gap: 4px; border-top: 0; border-right: 1px solid var(--line); padding: 18px 12px; }
+  nav.tabs button { flex-direction: row; justify-content: flex-start; gap: 12px; font-size: 15px !important; padding: 12px 14px !important; border-radius: 10px; }
+  nav.tabs button:hover { background: var(--panel); color: var(--chalk); }
+  nav.tabs button[aria-current="true"] { background: var(--panel); box-shadow: inset 3px 0 0 var(--amber); }
+  main#view { grid-row: 2; grid-column: 2; padding: 24px 28px 48px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; align-items: start; gap: 16px; }
+  .app:has(nav.tabs[hidden]) main#view { grid-column: 1 / -1; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
+  .clubs { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important; }
+  main#view > :not(.card), main#view > .card.alert, main#view > .paper, main#view > .card:has(table) { grid-column: 1 / -1; }
+  #mk-res { display: contents; }
+  .seg button { padding: 10px 8px; font-size: 14px; }
+  .seg.wrap { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)) !important; }
+  .card { padding: 18px 20px; }
+  .btn:hover:not(:disabled), .prow:hover, .club-btn:hover { filter: brightness(1.12); }
+  .match .board, .match .feed, .match .controls { max-width: 760px; }
+}
+@media (min-width: 1440px) { main#view { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 </style>
 
 <div class="app" id="app">
